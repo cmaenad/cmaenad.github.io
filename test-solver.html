@@ -1,222 +1,68 @@
 <!DOCTYPE html>
 <html lang="es">
 <head><meta charset="UTF-8"><title>Test Solver</title>
-<style>
-body{font-family:monospace;background:#111;color:#eee;padding:20px;font-size:13px;}
-.ok{color:#4f4}.err{color:#f44;font-weight:bold}.info{color:#fa4}
-pre{background:#1a1a1a;padding:6px;border-radius:4px;margin:2px 0;font-size:11px;}
-</style>
+<style>body{font-family:monospace;background:#111;color:#eee;padding:20px;font-size:13px;}.ok{color:#4f4}.err{color:#f44;font-weight:bold}.info{color:#fa4}</style>
 </head>
 <body>
-<h2>Test Solver Determinista</h2>
+<h2>Test Solver</h2>
 <div id="out"></div>
 <script type="module">
-import { Cube } from './js/cube.js?v=5';
-
 const out = document.getElementById('out');
-let pass=0, fail=0;
-
-function log(label, ok, extra='') {
-  const d=document.createElement('div');
-  d.className=ok?'ok':'err';
-  d.textContent=(ok?'✓ ':'✗ ')+label+(extra?' → '+extra:'');
-  out.appendChild(d); ok?pass++:fail++;
-}
-function info(msg) {
-  const d=document.createElement('div');
-  d.className='info'; d.textContent='ℹ '+msg; out.appendChild(d);
+function log(msg, ok) {
+  const d = document.createElement('div');
+  d.className = ok===undefined?'info':(ok?'ok':'err');
+  d.textContent = (ok===true?'✓ ':ok===false?'✗ ':'ℹ ') + msg;
+  out.appendChild(d);
+  console.log(d.textContent);
 }
 
-// ── Solver inline (sin BFS, determinista) ────────────────────────
-// Importamos el mismo motor de cube.js y replicamos el solver aquí
-// para que corra en el hilo principal sin worker
+log('Script iniciado');
 
-const FACE_CW=[6,3,0,7,4,1,8,5,2];
-const FACE_CCW=[2,5,8,1,4,7,0,3,6];
-const Sf=(f,i)=>f*9+i;
-const CYC={
-  U:[[Sf(2,0),Sf(5,0),Sf(3,0),Sf(4,0)],[Sf(2,1),Sf(5,1),Sf(3,1),Sf(4,1)],[Sf(2,2),Sf(5,2),Sf(3,2),Sf(4,2)]],
-  D:[[Sf(2,6),Sf(4,6),Sf(3,6),Sf(5,6)],[Sf(2,7),Sf(4,7),Sf(3,7),Sf(5,7)],[Sf(2,8),Sf(4,8),Sf(3,8),Sf(5,8)]],
-  F:[[Sf(0,6),Sf(5,0),Sf(1,2),Sf(4,8)],[Sf(0,7),Sf(5,3),Sf(1,1),Sf(4,5)],[Sf(0,8),Sf(5,6),Sf(1,0),Sf(4,2)]],
-  B:[[Sf(0,2),Sf(4,0),Sf(1,6),Sf(5,8)],[Sf(0,1),Sf(4,3),Sf(1,7),Sf(5,5)],[Sf(0,0),Sf(4,6),Sf(1,8),Sf(5,2)]],
-  L:[[Sf(0,0),Sf(2,0),Sf(1,0),Sf(3,8)],[Sf(0,3),Sf(2,3),Sf(1,3),Sf(3,5)],[Sf(0,6),Sf(2,6),Sf(1,6),Sf(3,2)]],
-  R:[[Sf(0,2),Sf(2,2),Sf(1,2),Sf(3,6)],[Sf(0,5),Sf(2,5),Sf(1,5),Sf(3,3)],[Sf(0,8),Sf(2,8),Sf(1,8),Sf(3,0)]],
-};
-const FI={U:0,D:1,F:2,B:3,L:4,R:5};
-class CW{
-  constructor(){this.s=Array.from({length:6},(_,i)=>Array(9).fill(i));}
-  clone(){const c=new CW();c.s=this.s.map(f=>[...f]);return c;}
-  _apply(fi,cyc,cw){
-    const flat=this.s.flat(),next=[...flat];
-    const base=fi*9,rot=cw?FACE_CW:FACE_CCW;
-    for(let i=0;i<9;i++) next[base+i]=flat[base+rot[i]];
-    for(const[a,b,c,d]of cyc){
-      if(cw){next[b]=flat[a];next[c]=flat[b];next[d]=flat[c];next[a]=flat[d];}
-      else  {next[d]=flat[a];next[c]=flat[d];next[b]=flat[c];next[a]=flat[b];}
-    }
-    for(let f=0;f<6;f++) for(let i=0;i<9;i++) this.s[f][i]=next[f*9+i];
-  }
-  move(n){const f=n[0],mod=n.slice(1),cw=!mod.includes("'"),t=mod.includes('2')?2:1;for(let i=0;i<t;i++)this._apply(FI[f],CYC[f],cw);}
-  applyMoves(ms){ms.forEach(m=>this.move(m));}
-  isSolved(){return this.s.every(f=>f.every(v=>v===f[4]));}
-  cc(f){return this.s[f][4];}
-  c(f,i){return this.s[f][i];}
-  fromCube(cube){this.s=cube.state.map(f=>[...f]);}
-}
+try {
+  const mod = await import('./js/cube.js?v=6');
+  log('cube.js importado OK');
+  const { Cube } = mod;
 
-function exec(cube,sol,...moves){moves.forEach(m=>{cube.move(m);sol.push(m);});}
-
-function findEdge(cube,c1,c2){
-  const edges=[[0,1,3,1],[0,3,4,1],[0,5,5,1],[0,7,2,1],[1,1,2,7],[1,3,4,7],[1,5,5,7],[1,7,3,7],[2,3,4,5],[2,5,5,3],[3,3,5,5],[3,5,4,3]];
-  for(const[f1,i1,f2,i2]of edges){const a=cube.c(f1,i1),b=cube.c(f2,i2);if((a===c1&&b===c2)||(a===c2&&b===c1))return{f1,i1,f2,i2};}
-  return null;
-}
-function bringEdgeToD(cube,sol,loc){
-  const{f1,i1,f2,i2}=loc;
-  if(f1===1||f2===1)return;
-  if(f1===0||f2===0){const sf=f1===0?f2:f1;const fn='UDFBLR'[sf];exec(cube,sol,fn,fn);return;}
-  const midToD={'2,3':["F'","D","F"],'2,5':["F","D'","F'"],'4,5':["L'","D","L"],'4,3':["L","D'","L'"],'5,3':["R","D'","R'"],'5,5':["R'","D","R"],'3,3':["B","D'","B'"],'3,5':["B'","D","B"]};
-  const seq=midToD[`${f1},${i1}`]||midToD[`${f2},${i2}`];
-  if(seq)exec(cube,sol,...seq);
-}
-function findCornerInD(cube,c1,c2,c3){
-  const dc=[[[1,2],[2,8],[5,6]],[[1,0],[4,8],[2,6]],[[1,6],[3,8],[4,6]],[[1,8],[5,8],[3,6]]];
-  for(const pos of dc){const cols=pos.map(([f,i])=>cube.c(f,i));if(cols.includes(c1)&&cols.includes(c2)&&(c3===undefined||cols.includes(c3)))return pos;}
-  return null;
-}
-
-const U_EDGES=[{u:7,side:2,sideIdx:1},{u:5,side:5,sideIdx:1},{u:1,side:3,sideIdx:1},{u:3,side:4,sideIdx:1}];
-const U_CORNERS=[{u:8,f1:2,i1:2,f2:5,i2:0},{u:6,f1:4,i1:2,f2:2,i2:0},{u:0,f1:3,i1:2,f2:4,i2:0},{u:2,f1:5,i1:2,f2:3,i2:0}];
-const MID_EDGES=[{f1:2,i1:5,f2:5,i2:3},{f1:4,i1:5,f2:2,i2:3},{f1:5,i1:5,f2:3,i2:3},{f1:3,i1:5,f2:4,i2:3}];
-
-function solveCrossU(cube,sol){
-  const cu=cube.cc(0);
-  for(const{u:uIdx,side:sideF,sideIdx}of U_EDGES){
-    const cSide=cube.cc(sideF);
-    for(let attempt=0;attempt<8;attempt++){
-      if(cube.c(0,uIdx)===cu&&cube.c(sideF,sideIdx)===cSide)break;
-      const loc=findEdge(cube,cu,cSide);if(!loc)break;
-      bringEdgeToD(cube,sol,loc);
-      for(let r=0;r<4;r++){const loc2=findEdge(cube,cu,cSide);if(loc2&&(loc2.f2===sideF||loc2.f1===sideF)&&(loc2.f1===1||loc2.f2===1))break;exec(cube,sol,'D');}
-      const fn='UDFBLR'[sideF];exec(cube,sol,fn,fn);
-    }
-  }
-}
-function solveTopCorners(cube,sol){
-  const cu=cube.cc(0);
-  for(const{u:uIdx,f1,i1,f2,i2}of U_CORNERS){
-    const c1=cube.cc(f1),c2=cube.cc(f2);
-    for(let attempt=0;attempt<12;attempt++){
-      if(cube.c(0,uIdx)===cu&&cube.c(f1,i1)===c1&&cube.c(f2,i2)===c2)break;
-      if(cube.c(0,uIdx)===cu||cube.c(f1,i1)===cu||cube.c(f2,i2)===cu){const fn='UDFBLR'[f1];exec(cube,sol,fn,'U',fn+"'","U'");}
-      for(let r=0;r<4;r++){const loc=findCornerInD(cube,cu,c1,c2);if(loc&&loc.some(([f])=>f===f1)&&loc.some(([f])=>f===f2))break;exec(cube,sol,'D');}
-      const fn='UDFBLR'[f1];
-      for(let i=0;i<5;i++){if(cube.c(0,uIdx)===cu&&cube.c(f1,i1)===c1&&cube.c(f2,i2)===c2)break;exec(cube,sol,fn,'U',fn+"'","U'");}
-    }
-  }
-}
-function solveMiddleEdges(cube,sol){
-  const cu=cube.cc(0),cd=cube.cc(1);
-  for(const{f1,i1,f2,i2}of MID_EDGES){
-    const c1=cube.cc(f1),c2=cube.cc(f2);
-    for(let attempt=0;attempt<8;attempt++){
-      if(cube.c(f1,i1)===c1&&cube.c(f2,i2)===c2)break;
-      if(cube.c(f1,i1)!==c1||cube.c(f2,i2)!==c2){const fn='UDFBLR'[f1];exec(cube,sol,'U',fn,"U'",fn+"'","U'","UDFBLR"[f2]+"'","U","UDFBLR"[f2]);}
-      let found=false;
-      for(let r=0;r<4&&!found;r++){
-        const uEdges=[[0,7,2,1],[0,5,5,1],[0,1,3,1],[0,3,4,1]];
-        for(const[uf,ui,sf,si]of uEdges){
-          const a=cube.c(uf,ui),b=cube.c(sf,si);
-          if(a===cu||a===cd||b===cu||b===cd)continue;
-          if((a===c1&&b===c2)||(a===c2&&b===c1)){
-            for(let rr=0;rr<4;rr++){if(cube.c(sf,si)===c1)break;exec(cube,sol,'U');}
-            const fn='UDFBLR'[f1],fn2='UDFBLR'[f2];
-            if(cube.c(f1,1)===c1){exec(cube,sol,'U',fn,"U'",fn+"'","U'",fn2+"'","U",fn2);}
-            else{exec(cube,sol,"U'",fn2+"'","U",fn2,"U",fn,"U'",fn+"'");}
-            found=true;break;
-          }
-        }
-        if(!found)exec(cube,sol,'U');
-      }
-    }
-  }
-}
-function solveBottomCross(cube,sol){
-  const cd=cube.cc(1);
-  for(let attempt=0;attempt<4;attempt++){
-    if([1,3,5,7].every(i=>cube.c(1,i)===cd))return;
-    exec(cube,sol,'F','R','U',"R'","U'","F'");
-  }
-}
-function orientBottomCorners(cube,sol){
-  const cd=cube.cc(1);
-  for(let attempt=0;attempt<8;attempt++){
-    if(cube.s[1].every(v=>v===cd))return;
-    exec(cube,sol,'R','U',"R'","U",'R',"U2","R'");
-    for(let r=0;r<4;r++){if(cube.c(1,2)!==cd)break;exec(cube,sol,'D');}
-  }
-}
-function permuteBottomCorners(cube,sol){
-  for(let attempt=0;attempt<8;attempt++){
-    if(cube.c(2,0)===cube.c(2,2)&&cube.c(5,0)===cube.c(5,2)&&cube.c(3,0)===cube.c(3,2)&&cube.c(4,0)===cube.c(4,2))return;
-    exec(cube,sol,'R',"U'","R'","U'","R","U","R'","F'","R","U","R'","U'","R'","F","R");
-  }
-}
-function permuteBottomEdges(cube,sol){
-  for(let r=0;r<4;r++){if(cube.c(2,7)===cube.c(2,4))break;exec(cube,sol,'D');}
-  for(let attempt=0;attempt<6;attempt++){
-    if(cube.isSolved())return;
-    exec(cube,sol,"R2","U","R","U","R'","U'","R'","U'","R'","U","R'");
-    for(let r=0;r<4;r++){if(cube.c(2,7)===cube.c(2,4))break;exec(cube,sol,'D');}
-  }
-}
-
-function solve(cube) {
-  const w=new CW(); w.fromCube(cube);
-  if(w.isSolved()) return [];
-  const sol=[];
-  solveCrossU(w,sol);      info('Tras cruz U: '+sol.length+' movs');
-  solveTopCorners(w,sol);  info('Tras esquinas U: '+sol.length+' movs');
-  solveMiddleEdges(w,sol); info('Tras capa media: '+sol.length+' movs');
-  solveBottomCross(w,sol); info('Tras cruz D: '+sol.length+' movs');
-  orientBottomCorners(w,sol); info('Tras orientar D: '+sol.length+' movs');
-  permuteBottomCorners(w,sol); info('Tras permutar esquinas D: '+sol.length+' movs');
-  permuteBottomEdges(w,sol); info('Tras permutar aristas D: '+sol.length+' movs');
-  return {sol, solved: w.isSolved()};
-}
-
-// ── Tests ─────────────────────────────────────────────────────────
-
-function testScramble(label, scramble) {
   const c = new Cube();
-  c.applyMoves(scramble);
-  const t0 = performance.now();
-  const result = solve(c);
-  const dt = Math.round(performance.now()-t0);
-  if(!result){log(label+': solve devolvió null',false);return;}
-  const {sol,solved:wSolved} = result;
-  // Verificar aplicando la solución al cubo original
-  const c2 = new Cube();
-  c2.applyMoves(scramble);
-  c2.applyMoves(sol);
-  const ok = c2.isSolved();
-  log(`${label}: ${sol.length} movs en ${dt}ms`, ok, ok?'':'NO RESUELTO estado='+c2.state.map((f,i)=>'UDFBLR'[i]+':'+f.join('')).join(' '));
+  log('Cube creado, isSolved: ' + c.isSolved(), c.isSolved());
+
+  c.move('U');
+  log('Tras U, isSolved: ' + c.isSolved(), !c.isSolved());
+  log('Estado U: ' + c.state.map((f,i)=>'UDFBLR'[i]+':'+f.join('')).join(' '));
+
+  // Test solver via Worker
+  log('Iniciando Worker...');
+  const worker = new Worker('./js/solver-worker.js');
+  
+  worker.onerror = (e) => {
+    log('Worker ERROR: ' + e.message + ' (line ' + e.lineno + ')', false);
+  };
+  
+  worker.onmessage = (e) => {
+    log('Worker respondió: ' + JSON.stringify(e.data));
+    if (e.data.error) {
+      log('Error en solver: ' + e.data.error, false);
+      if (e.data.stack) log('Stack: ' + e.data.stack);
+    } else {
+      const moves = e.data.moves;
+      log('Movimientos encontrados: ' + moves.length + ' → ' + moves.join(' '), moves.length > 0);
+      // Verificar
+      const c2 = new Cube();
+      c2.move('U');
+      c2.applyMoves(moves);
+      log('Tras aplicar solución, isSolved: ' + c2.isSolved(), c2.isSolved());
+    }
+    worker.terminate();
+  };
+
+  const state = c.serialize();
+  log('Enviando estado al worker: ' + state);
+  worker.postMessage({ state });
+
+} catch(e) {
+  log('ERROR: ' + e.message, false);
+  log('Stack: ' + e.stack);
 }
-
-testScramble('Cubo resuelto', []);
-testScramble('U', ['U']);
-testScramble("U'", ["U'"]);
-testScramble('R U', ['R','U']);
-testScramble("R U R' U'", ['R','U',"R'","U'"]);
-testScramble('5 movs', ['R','U','F','L','D']);
-testScramble('10 movs', ['R','U',"R'","F","D","L","B","U'","R2","F'"]);
-testScramble('15 movs', ['R','U',"R'","U'","R'","F","R2","U'","R'","U'","R","U","R'","F'","R"]);
-testScramble('20 movs', ['R','U','R2',"F'","U","L","U'","L'","F","R2","U'","R'","U","R","U'","R'","F","R","U","R'"]);
-
-const h=document.createElement('h3');
-h.textContent=`Resultado: ${pass} OK, ${fail} FALLOS`;
-h.style.color=fail===0?'#4f4':'#f44';
-out.appendChild(h);
 </script>
 </body>
 </html>
