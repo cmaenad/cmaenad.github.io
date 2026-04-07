@@ -136,6 +136,26 @@ sec('Algoritmos con orden conocido');
   log("(R' F R F')×6",c.isSolved());
 }
 {
+  // Test ultra-simple: R desde estado resuelto debe cambiar exactamente 20 stickers
+  const c=new Cube();
+  const before=c.state.flat();
+  c.move('R');
+  const after=c.state.flat();
+  const ch=[];
+  for(let i=0;i<54;i++) if(before[i]!==after[i]) ch.push(i);
+  log('R desde resuelto: 20 stickers cambiados', ch.length===20, 'cambiados='+ch.length+' idx='+ch.join(','));
+  // Verificar anillo R con offsets correctos
+  // U=0..8, D=9..17, F=18..26, B=27..35, L=36..44, R=45..53
+  // Anillo R: U[2,5,8]=2,5,8 | F[2,5,8]=20,23,26 | D[2,5,8]=11,14,17 | B[6,3,0]=33,30,27
+  const ring=[2,5,8, 20,23,26, 11,14,17, 33,30,27];
+  const ringCh=ring.filter(i=>before[i]!==after[i]);
+  log('R: 12 del anillo cambiaron', ringCh.length===12, 'anillo='+ringCh.length+' idx='+ringCh.join(','));
+  // Cara R: 45..53 excepto centro 49
+  const face=[45,46,47,48,50,51,52,53];
+  const faceCh=face.filter(i=>before[i]!==after[i]);
+  log('R: 8 de la cara cambiaron', faceCh.length===8, 'cara='+faceCh.length);
+}
+{
   // Trazar T-perm movimiento a movimiento
   // El T-perm correcto debería mover solo 4 stickers (2 esquinas + 2 aristas)
   const tp=['R','U',"R'","U'","R'","F","R2","U'","R'","U'","R","U","R'","F'"];
