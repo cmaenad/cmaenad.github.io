@@ -4,65 +4,51 @@
 <style>body{font-family:monospace;background:#111;color:#eee;padding:20px;font-size:13px;}.ok{color:#4f4}.err{color:#f44;font-weight:bold}.info{color:#fa4}</style>
 </head>
 <body>
-<h2>Test Solver</h2>
+<h2>Test Solver IDA*</h2>
 <div id="out"></div>
 <script type="module">
+import { Cube } from './js/cube.js?v=6';
 const out = document.getElementById('out');
-function log(msg, ok) {
-  const d = document.createElement('div');
-  d.className = ok===undefined?'info':(ok?'ok':'err');
-  d.textContent = (ok===true?'✓ ':ok===false?'✗ ':'ℹ ') + msg;
-  out.appendChild(d);
-  console.log(d.textContent);
-}
+let pass=0,fail=0;
+function log(msg,ok){const d=document.createElement('div');d.className=ok===undefined?'info':(ok?'ok':'err');d.textContent=(ok===true?'✓ ':ok===false?'✗ ':'ℹ ')+msg;out.appendChild(d);if(ok===false)fail++;if(ok===true)pass++;}
 
-log('Script iniciado');
-
-try {
-  const mod = await import('./js/cube.js?v=6');
-  log('cube.js importado OK');
-  const { Cube } = mod;
-
-  const c = new Cube();
-  log('Cube creado, isSolved: ' + c.isSolved(), c.isSolved());
-
-  c.move('U');
-  log('Tras U, isSolved: ' + c.isSolved(), !c.isSolved());
-  log('Estado U: ' + c.state.map((f,i)=>'UDFBLR'[i]+':'+f.join('')).join(' '));
-
-  // Test solver via Worker
-  log('Iniciando Worker...');
-  const worker = new Worker('./js/solver-worker.js');
-  
-  worker.onerror = (e) => {
-    log('Worker ERROR: ' + e.message + ' (line ' + e.lineno + ')', false);
-  };
-  
-  worker.onmessage = (e) => {
-    log('Worker respondió: ' + JSON.stringify(e.data));
-    if (e.data.error) {
-      log('Error en solver: ' + e.data.error, false);
-      if (e.data.stack) log('Stack: ' + e.data.stack);
-    } else {
+function testWorker(label, scramble) {
+  return new Promise(resolve => {
+    const c = new Cube();
+    c.applyMoves(scramble);
+    const state = c.serialize();
+    const t0 = performance.now();
+    const w = new Worker('./js/solver-worker.js');
+    w.onmessage = e => {
+      w.terminate();
+      const dt = Math.round(performance.now()-t0);
+      if(e.data.error){log(label+' ERROR: '+e.data.error,false);resolve();return;}
       const moves = e.data.moves;
-      log('Movimientos encontrados: ' + moves.length + ' → ' + moves.join(' '), moves.length > 0);
-      // Verificar
-      const c2 = new Cube();
-      c2.move('U');
-      c2.applyMoves(moves);
-      log('Tras aplicar solución, isSolved: ' + c2.isSolved(), c2.isSolved());
-    }
-    worker.terminate();
-  };
-
-  const state = c.serialize();
-  log('Enviando estado al worker: ' + state);
-  worker.postMessage({ state });
-
-} catch(e) {
-  log('ERROR: ' + e.message, false);
-  log('Stack: ' + e.stack);
+      const c2 = new Cube(); c2.applyMoves(scramble); c2.applyMoves(moves);
+      const ok = c2.isSolved();
+      log(`${label}: ${moves.length} movs en ${dt}ms`, ok);
+      resolve();
+    };
+    w.onerror = e => { w.terminate(); log(label+' Worker error: '+e.message,false); resolve(); };
+    w.postMessage({state});
+  });
 }
+
+log('Iniciando tests...');
+// Tests secuenciales para no saturar memoria
+await testWorker('Resuelto', []);
+await testWorker('U', ['U']);
+await testWorker("R U R' U'", ['R','U',"R'","U'"]);
+await testWorker('5 movs', ['R','U','F','L','D']);
+await testWorker('10 movs', ['R','U',"R'","F","D","L","B","U'","R2","F'"]);
+await testWorker('15 movs', ['R','U',"R'","U'","R'","F","R2","U'","R'","U'","R","U","R'","F'","R"]);
+await testWorker('20 movs (randomize)', (() => { const c=new Cube(); return c.randomize(20); })());
+await testWorker('25 movs (randomize)', (() => { const c=new Cube(); return c.randomize(25); })());
+
+const h=document.createElement('h3');
+h.textContent=`Resultado: ${pass} OK, ${fail} FALLOS`;
+h.style.color=fail===0?'#4f4':'#f44';
+out.appendChild(h);
 </script>
 </body>
 </html>
