@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"><title>Test Movimientos</title>
+<style>
+body{font-family:monospace;background:#111;color:#eee;padding:20px;font-size:12px;}
+.ok{color:#4f4}.err{color:#f44;font-weight:bold}.sec{color:#88f;font-size:14px;margin-top:12px;display:block}
+pre{background:#1a1a1a;padding:4px 8px;border-radius:4px;margin:2px 0;font-size:11px;white-space:pre-wrap}
+</style>
+</head>
+<body>
+<h2>Test exhaustivo de movimientos</h2>
+<div id="out"></div>
+<script type="module">
+import { Cube } from './js/cube.js?v=7';
+const out = document.getElementById('out');
+let pass=0, fail=0;
+
+function sec(title) {
+  const d=document.createElement('span');
+  d.className='sec'; d.textContent='── '+title+' ──';
+  out.appendChild(d);
+}
+function log(label, ok, extra='') {
+  const d=document.createElement('div');
+  d.className=ok?'ok':'err';
+  d.textContent=(ok?'✓ ':'✗ ')+label+(extra?' ['+extra+']':'');
+  out.appendChild(d);
+  ok?pass++:fail++;
+}
+function showState(cube) {
+  const p=document.createElement('pre');
+  const n='UDFBLR';
+  p.textContent=cube.state.map((f,i)=>n[i]+': '+f.join(' ')).join('\n');
+  out.appendChild(p);
+}
+
+// ── Helpers ───────────────────────────────────────────────────────
+// Obtiene la fila de una cara: top=0,1,2 / mid=3,4,5 / bot=6,7,8
+const row = (cube,f,r) => [cube.state[f][r*3], cube.state[f][r*3+1], cube.state[f][r*3+2]];
+// Obtiene la columna de una cara: left=0,3,6 / mid=1,4,7 / right=2,5,8
+const col = (cube,f,c) => [cube.state[f][c], cube.state[f][c+3], cube.state[f][c+6]];
+// Todos los stickers de una cara son el mismo color
+const uniform = (cube,f,color) => cube.state[f].every(v=>v===color);
+// Una fila/col tiene todos el mismo color
+const allSame = (arr,color) => arr.every(v=>v===color);
+// Cara no modificada
+const faceUntouched = (cube,f) => uniform(cube,f,f);
+
+// ── SECCIÓN 1: Identidades básicas ───────────────────────────────
+sec('X×4 = identidad');
+for(const m of ['U','D','F','B','L','R']) {
+  const c=new Cube(); c.move(m);c.move(m);c.move(m);c.move(m);
+  log(`${m}×4`, c.isSolved(), c.isSolved()?'':'cp='+c.state.map(f=>f.join('')).join('|'));
+}
+
+sec('X X\' = identidad');
+for(const m of ['U','D','F','B','L','R']) {
+  const c=new Cube(); c.move(m); c.move(m+"'");
+  log(`${m} ${m}'`, c.isSolved());
+}
+
+sec('X2 X2 = identidad');
+for(const m of ['U','D','F','B','L','R']) {
+  const c=new Cube(); c.move(m+'2'); c.move(m+'2');
+  log(`${m}2 ${m}2`, c.isSolved());
+}
+
+// ── SECCIÓN 2: Caras no afectadas ────────────────────────────────
+sec('U solo afecta fila superior de F/R/B/L, no toca D');
+{
+  const c=new Cube(); c.move('U');
+  log('U: D intacta', faceUntouched(c,1));
+  log('U: fila mid F intacta', allSame(row(c,2,1),2) && allSame(row(c,2,2),2));
+  log('U: fila mid R intacta', allSame(row(c,5,1),5) && allSame(row(c,5,2),5));
+  log('U: fila mid B intacta', allSame(row(c,3,1),3) && allSame(row(c,3,2),3));
+  log('U: fila mid L intacta', allSame(row(c,4,1),4) && allSame(row(c,4,2),4));
+  log('U: cara U intacta (color)', c.state[0].every(v=>v===0));
+}
+
+sec('D solo afecta fila inferior de F/R/B/L, no toca U');
+{
+  const c=new Cube(); c.move('D');
+  log('D: U intacta', faceUntouched(c,0));
+  log('D: fila top F intacta', allSame(row(c,2,0),2) && allSame(row(c,2,1),2));
+  log('D: fila top R intacta', allSame(row(c,5,0),5) && allSame(row(c,5,1),5));
+  log('D: fila top B intacta', allSame(row(c,3,0),3) && allSame(row(c,3,1),3));
+  log('D: fila top L intacta', allSame(row(c,4,0),4) && allSame(row(c,4,1),4));
+  log('D: cara D intacta (color)', c.state[1].every(v=>v===1));
+}
+
+sec('F solo afecta col/fila adyacente de U/D/L/R, no toca B');
+{
+  const c=new Cube(); c.move('F');
+  log('F: B intacta', faceUntouched(c,3));
+  log('F: col izq U intacta', allSame(col(c,0,0),0) && allSame(col(c,0,1),0));
+  log('F: col der L intacta', allSame(col(c,4,0),4) && allSame(col(c,4,1),4));
+  log('F: cara F intacta (color)', c.state[2].every(v=>v===2));
+}
+
+sec('B solo afecta col/fila adyacente de U/D/L/R, no toca F');
+{
+  const c=new Cube(); c.move('B');
+  log('B: F intacta', faceUntouched(c,2));
+  log('B: cara B intacta (color)', c.state[3].every(v=>v===3));
+}
+
+sec('L solo afecta col izquierda de U/F/D/B, no toca R');
+{
+  const c=new Cube(); c.move('L');
+  log('L: R intacta', faceUntouched(c,5));
+  log('L: col der U intacta', allSame(col(c,0,2),0));
+  log('L: col der F intacta', allSame(col(c,2,2),2));
+  log('L: col der D intacta', allSame(col(c,1,2),1));
+  log('L: cara L intacta (color)', c.state[4].every(v=>v===4));
+}
+
+sec('R solo afecta col derecha de U/F/D/B, no toca L');
+{
+  const c=new Cube(); c.move('R');
+  log('R: L intacta', faceUntouched(c,4));
+  log('R: col izq U intacta', allSame(col(c,0,0),0));
+  log('R: col izq F intacta', allSame(col(c,2,0),2));
+  log('R: col izq D intacta', allSame(col(c,1,0),1));
+  log('R: cara R intacta (color)', c.state[5].every(v=>v===5));
+}
+
+// ── SECCIÓN 3: Dirección correcta de cada movimiento ─────────────
+sec('U horario: F→R→B→L (fila superior)');
+{
+  const c=new Cube(); c.move('U');
+  // Fila sup de F (color 2) debe ir a R
+  log('U: fila sup F(2) → R', allSame(row(c,5,0),2), 'R top='+row(c,5,0));
+  // Fila sup de R (color 5) debe ir a B
+  log('U: fila sup R(5) → B', allSame(row(c,3,0),5), 'B top='+row(c,3,0));
+  // Fila sup de B (color 3) debe ir a L
+  log('U: fila sup B(3) → L', allSame(row(c,4,0),3), 'L top='+row(c,4,0));
+  // Fila sup de L (color 4) debe ir a F
+  log('U: fila sup L(4) → F', allSame(row(c,2,0),4), 'F top='+row(c,2,0));
+  showState(c);
+}
+
+sec("U' antihorario: F→L→B→R (fila superior)");
+{
+  const c=new Cube(); c.move("U'");
+  log("U': fila sup F(2) → L", allSame(row(c,4,0),2), 'L top='+row(c,4,0));
+  log("U': fila sup L(4) → B", allSame(row(c,3,0),4), 'B top='+row(c,3,0));
+  log("U': fila sup B(3) → R", allSame(row(c,5,0),3), 'R top='+row(c,5,0));
+  log("U': fila sup R(5) → F", allSame(row(c,2,0),5), 'F top='+row(c,2,0));
+}
+
+sec('D horario: F→L→B→R (fila inferior)');
+{
+  const c=new Cube(); c.move('D');
+  log('D: fila inf F(2) → L', allSame(row(c,4,2),2), 'L bot='+row(c,4,2));
+  log('D: fila inf L(4) → B', allSame(row(c,3,2),4), 'B bot='+row(c,3,2));
+  log('D: fila inf B(3) → R', allSame(row(c,5,2),3), 'R bot='+row(c,5,2));
+  log('D: fila inf R(5) → F', allSame(row(c,2,2),5), 'F bot='+row(c,2,2));
+  showState(c);
+}
+
+sec('F horario: U(inf)→R(izq)→D(sup,inv)→L(der,inv)');
+{
+  const c=new Cube(); c.move('F');
+  // Fila inf U (color 0) → col izq R (de arriba a abajo)
+  log('F: fila inf U(0) → col izq R', allSame(col(c,5,0),0), 'R left='+col(c,5,0));
+  // Col izq R (color 5) → fila sup D (invertida)
+  log('F: col izq R(5) → fila sup D', allSame(row(c,1,0),5), 'D top='+row(c,1,0));
+  // Fila sup D (color 1) → col der L (invertida, de abajo a arriba)
+  log('F: fila sup D(1) → col der L', allSame(col(c,4,2),1), 'L right='+col(c,4,2));
+  // Col der L (color 4) → fila inf U
+  log('F: col der L(4) → fila inf U', allSame(row(c,0,2),4), 'U bot='+row(c,0,2));
+  showState(c);
+}
+
+sec('B horario: U(sup,inv)→L(izq)→D(inf)→R(der,inv)');
+{
+  const c=new Cube(); c.move('B');
+  // Fila sup U invertida (color 0) → col izq L
+  log('B: fila sup U(0) → col izq L', allSame(col(c,4,0),0), 'L left='+col(c,4,0));
+  // Col izq L (color 4) → fila inf D
+  log('B: col izq L(4) → fila inf D', allSame(row(c,1,2),4), 'D bot='+row(c,1,2));
+  // Fila inf D (color 1) → col der R invertida
+  log('B: fila inf D(1) → col der R', allSame(col(c,5,2),1), 'R right='+col(c,5,2));
+  // Col der R (color 5) → fila sup U invertida
+  log('B: col der R(5) → fila sup U', allSame(row(c,0,0),5), 'U top='+row(c,0,0));
+  showState(c);
+}
+
+sec('L horario: U(izq)→F(izq)→D(izq)→B(der,inv)');
+{
+  const c=new Cube(); c.move('L');
+  // Col izq U (color 0) → col izq F
+  log('L: col izq U(0) → col izq F', allSame(col(c,2,0),0), 'F left='+col(c,2,0));
+  // Col izq F (color 2) → col izq D
+  log('L: col izq F(2) → col izq D', allSame(col(c,1,0),2), 'D left='+col(c,1,0));
+  // Col izq D (color 1) → col der B invertida
+  log('L: col izq D(1) → col der B', allSame(col(c,3,2),1), 'B right='+col(c,3,2));
+  // Col der B (color 3) → col izq U
+  log('L: col der B(3) → col izq U', allSame(col(c,0,0),3), 'U left='+col(c,0,0));
+  showState(c);
+}
+
+sec('R horario: U(der)→F(der)→D(der)→B(izq,inv)');
+{
+  const c=new Cube(); c.move('R');
+  // Col der U (color 0) → col der F
+  log('R: col der U(0) → col der F', allSame(col(c,2,2),0), 'F right='+col(c,2,2));
+  // Col der F (color 2) → col der D
+  log('R: col der F(2) → col der D', allSame(col(c,1,2),2), 'D right='+col(c,1,2));
+  // Col der D (color 1) → col izq B invertida
+  log('R: col der D(1) → col izq B', allSame(col(c,3,0),1), 'B left='+col(c,3,0));
+  // Col izq B (color 3) → col der U
+  log('R: col izq B(3) → col der U', allSame(col(c,0,2),3), 'U right='+col(c,0,2));
+  showState(c);
+}
+
+// ── SECCIÓN 4: Conservación de stickers ──────────────────────────
+sec('Conservación: cada color aparece exactamente 9 veces');
+for(const m of ['U','D','F','B','L','R',"U'","D'","F'","B'","L'","R'","U2","D2","F2","B2","L2","R2"]) {
+  const c=new Cube(); c.move(m);
+  const flat=c.state.flat();
+  const counts=Array(6).fill(0);
+  flat.forEach(v=>counts[v]++);
+  const ok=counts.every(n=>n===9);
+  log(`${m}: 9×cada color`, ok, ok?'':counts.join(','));
+}
+
+// ── SECCIÓN 5: Algoritmos conocidos ──────────────────────────────
+sec('Algoritmos clásicos = identidad');
+{
+  const c=new Cube();
+  for(let i=0;i<6;i++) c.applyMoves(['R','U',"R'","U'"]);
+  log('(R U R\' U\')×6', c.isSolved());
+}
+{
+  const c=new Cube();
+  for(let i=0;i<6;i++) c.applyMoves(['R','U',"R'","U","R","U2","R'"]);
+  log('Sune×6', c.isSolved());
+}
+{
+  // T-perm tiene orden 2
+  const c=new Cube();
+  for(let i=0;i<2;i++) c.applyMoves(['R','U',"R'","U'","R'","F","R2","U'","R'","U'","R","U","R'","F'"]);
+  log('T-perm×2', c.isSolved());
+}
+{
+  // U-perm tiene orden 3... no, orden 3 no. Verificar con ×6
+  const c=new Cube();
+  for(let i=0;i<6;i++) c.applyMoves(["R2","U","R","U","R'","U'","R'","U'","R'","U","R'"]);
+  log('U-perm×6', c.isSolved());
+}
+{
+  // Superflip: 20 movimientos, orden 2
+  const superflip=["U","R2","F","B","R","B2","R","U2","L","B2","R","U'","D'","R2","F","R'","L","B2","U2","F2"];
+  const c=new Cube();
+  c.applyMoves(superflip); c.applyMoves(superflip);
+  log('Superflip×2', c.isSolved());
+}
+
+// ── SECCIÓN 6: Invertir mezcla ────────────────────────────────────
+sec('Invertir mezcla = identidad');
+{
+  const scrambles = [
+    ['R','U',"R'","F","D","L","B","U'","R2","F'"],
+    ['F2','L',"B'","U","R","D2","F","L'","B","U2"],
+    ['R','U','R2',"F'","U","L","U'","L'","F","R2","U'","R'"],
+  ];
+  for(const sc of scrambles) {
+    const c=new Cube(); c.applyMoves(sc);
+    // Invertir: reverso + invertir cada movimiento
+    const inv=[...sc].reverse().map(m=>{
+      const f=m[0],mod=m.slice(1);
+      if(mod==='2') return f+'2';
+      if(mod==="'") return f;
+      return f+"'";
+    });
+    c.applyMoves(inv);
+    log('Mezcla+inversa: '+sc.join(' '), c.isSolved());
+  }
+}
+
+// ── Resumen ───────────────────────────────────────────────────────
+const h=document.createElement('h3');
+h.textContent=`Resultado: ${pass} OK, ${fail} FALLOS`;
+h.style.color=fail===0?'#4f4':'#f44';
+out.appendChild(h);
+</script>
+</body>
+</html>
