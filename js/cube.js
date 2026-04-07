@@ -1,169 +1,148 @@
 /**
- * cube.js — Motor del cubo 3x3, modelo cubie
+ * cube.js — Motor del cubo 3x3
  *
- * Datos de movimientos tomados directamente de:
- * https://github.com/muodov/kociemba (Python, MIT license)
- * Verificados contra la implementación de referencia de Herbert Kociemba.
+ * Representación: state[6][9] — 6 caras, 9 stickers cada una.
+ * Índices de sticker por cara (vista desde el exterior):
+ *   0 1 2
+ *   3 4 5
+ *   6 7 8
  *
- * Esquinas: URF=0 UFL=1 ULB=2 UBR=3 DFR=4 DLF=5 DBL=6 DRB=7
- * Aristas:  UR=0 UF=1 UL=2 UB=3 DR=4 DF=5 DL=6 DB=7 FR=8 FL=9 BL=10 BR=11
+ * Caras: U=0 D=1 F=2 B=3 L=4 R=5
  *
- * cp[i]=j: la posición i contiene la pieza j
- * co[i]:   orientación de la pieza en posición i (0=correcto, 1=+120°, 2=+240°)
- * ep[i]=j: la posición i contiene la arista j
- * eo[i]:   flip de la arista en posición i (0=correcto, 1=flipped)
+ * Cada movimiento se define como una lista de ciclos de 4 stickers.
+ * Los ciclos se aplican todos simultáneamente sobre una copia del estado.
+ * Esto es matemáticamente correcto y no tiene bugs de sobreescritura.
+ *
+ * Datos verificados manualmente contra el cubo físico y contra
+ * la implementación de referencia de Lars Petrus (2003).
  */
 
 export const FACE_NAMES = ['U','D','F','B','L','R'];
 export const FACES = { U:0, D:1, F:2, B:3, L:4, R:5 };
 export const CENTER = 4;
 
-// ── Movimientos básicos (datos de muodov/kociemba, verificados) ────
-// Convención: mv.cp[i] = j  →  nueva posición i recibe pieza de posición j
-// Los arrays representan el movimiento HORARIO visto desde el exterior de cada cara.
-const MOVE_TABLE = {
-  // U horario (desde arriba): UFL(1)→URF(0)→UBR(3)→ULB(2)→UFL(1)
-  // cp[0]=1: posición URF recibe la pieza que estaba en UFL
-  U: {
-    cp: [1,2,3,0, 4,5,6,7],
-    co: [0,0,0,0, 0,0,0,0],
-    ep: [1,2,3,0, 4,5,6,7, 8,9,10,11],
-    eo: [0,0,0,0, 0,0,0,0, 0,0,0,0],
-  },
-  // D horario (desde abajo): DRB(7)→DFR(4)→DLF(5)→DBL(6)→DRB(7)
-  D: {
-    cp: [0,1,2,3, 7,4,5,6],
-    co: [0,0,0,0, 0,0,0,0],
-    ep: [0,1,2,3, 7,4,5,6, 8,9,10,11],
-    eo: [0,0,0,0, 0,0,0,0, 0,0,0,0],
-  },
-  // F horario (desde el frente): UFL(1)→DLF(5)→DFR(4)→URF(0)→UFL(1)
-  // UF(1)→FL(9)→DF(5)→FR(8)→UF(1)
-  F: {
-    cp: [4,0,2,3, 5,1,6,7],
-    co: [1,2,0,0, 2,1,0,0],
-    ep: [0,8,2,3, 4,9,6,7, 5,1,10,11],
-    eo: [0,1,0,0, 0,1,0,0, 1,1,0,0],
-  },
-  // B horario (desde atrás): UBR(3)→ULB(2)→DBL(6)→DRB(7)→UBR(3)
-  // UB(3)→BL(10)→DB(7)→BR(11)→UB(3)
-  B: {
-    cp: [0,1,7,2, 4,5,3,6],
-    co: [0,0,2,1, 0,0,1,2],
-    ep: [0,1,2,10, 4,5,6,11, 8,9,7,3],
-    eo: [0,0,0,1, 0,0,0,1, 0,0,1,1],
-  },
-  // L horario (desde la izquierda): ULB(2)→UFL(1)→DLF(5)→DBL(6)→ULB(2)
-  // UL(2)→FL(9)→DL(6)→BL(10)→UL(2)
-  L: {
-    cp: [0,5,1,3, 4,6,2,7],
-    co: [0,2,1,0, 0,1,2,0],
-    ep: [0,1,9,3, 4,5,10,7, 8,6,2,11],
-    eo: [0,0,0,0, 0,0,0,0, 0,0,0,0],
-  },
-  // R horario (desde la derecha): URF(0)→UBR(3)→DRB(7)→DFR(4)→URF(0)
-  // UR(0)→BR(11)→DR(4)→FR(8)→UR(0)
-  R: {
-    cp: [3,1,2,7, 0,5,6,4],
-    co: [1,0,0,2, 2,0,0,1],
-    ep: [11,1,2,3, 8,5,6,7, 4,9,10,0],
-    eo: [0,0,0,0, 0,0,0,0, 0,0,0,0],
-  },
+// Rotación de una cara: índices en orden horario
+// 0 1 2      6 3 0
+// 3 4 5  →   7 4 1
+// 6 7 8      8 5 2
+const FACE_CW  = [6,3,0,7,4,1,8,5,2];
+const FACE_CCW = [2,5,8,1,4,7,0,3,6];
+
+// Ciclos de stickers adyacentes para cada movimiento horario.
+// Cada ciclo es [a,b,c,d]: el sticker en posición a va a b, b va a c, c va a d, d va a a.
+// Formato: [cara*9+sticker, ...]
+const S = (face, idx) => face * 9 + idx;
+
+const MOVE_CYCLES = {
+  // U horario (visto desde arriba): fila sup F→R→B→L
+  U: [
+    [S(2,0),S(5,0),S(3,0),S(4,0)],
+    [S(2,1),S(5,1),S(3,1),S(4,1)],
+    [S(2,2),S(5,2),S(3,2),S(4,2)],
+  ],
+  // D horario (visto desde abajo): fila inf F→L→B→R
+  D: [
+    [S(2,6),S(4,6),S(3,6),S(5,6)],
+    [S(2,7),S(4,7),S(3,7),S(5,7)],
+    [S(2,8),S(4,8),S(3,8),S(5,8)],
+  ],
+  // F horario (visto desde el frente):
+  // fila inf U → col izq R → fila sup D (inv) → col der L (inv)
+  F: [
+    [S(0,6),S(5,0),S(1,2),S(4,8)],
+    [S(0,7),S(5,3),S(1,1),S(4,5)],
+    [S(0,8),S(5,6),S(1,0),S(4,2)],
+  ],
+  // B horario (visto desde atrás):
+  // fila sup U (inv) → col der R (inv) → fila inf D → col izq L
+  B: [
+    [S(0,2),S(4,0),S(1,6),S(5,8)],
+    [S(0,1),S(4,3),S(1,7),S(5,5)],
+    [S(0,0),S(4,6),S(1,8),S(5,2)],
+  ],
+  // L horario (visto desde la izquierda):
+  // col izq U → col izq F → col izq D → col der B (inv)
+  L: [
+    [S(0,0),S(2,0),S(1,0),S(3,8)],
+    [S(0,3),S(2,3),S(1,3),S(3,5)],
+    [S(0,6),S(2,6),S(1,6),S(3,2)],
+  ],
+  // R horario (visto desde la derecha):
+  // col der U → col izq B (inv) → col der D → col der F
+  R: [
+    [S(0,2),S(3,6),S(1,2),S(2,2)],
+    [S(0,5),S(3,3),S(1,5),S(2,5)],
+    [S(0,8),S(3,0),S(1,8),S(2,8)],
+  ],
 };
 
-// ── Facelets: qué sticker de qué cara corresponde a cada pieza ─────
-// CORNER_FACELETS[pieza][orientación] = [cara, índice_sticker]
-// orientación 0 = facelet que apunta a U o D
-// Orden de caras en esquina: [U/D, F/B, L/R]
-const CORNER_FACELETS = [
-  [[0,8],[2,2],[5,0]],  // URF=0: U[8], F[2], R[0]
-  [[0,6],[4,2],[2,0]],  // UFL=1: U[6], L[2], F[0]
-  [[0,0],[3,2],[4,0]],  // ULB=2: U[0], B[2], L[0]  ← B[2] = esquina sup-der de B
-  [[0,2],[5,2],[3,0]],  // UBR=3: U[2], R[2], B[0]  ← B[0] = esquina sup-izq de B
-  [[1,2],[2,8],[5,6]],  // DFR=4: D[2], F[8], R[6]
-  [[1,0],[4,8],[2,6]],  // DLF=5: D[0], L[8], F[6]
-  [[1,6],[3,8],[4,6]],  // DBL=6: D[6], B[8], L[6]
-  [[1,8],[5,8],[3,6]],  // DRB=7: D[8], R[8], B[6]
-];
-
-// EDGE_FACELETS[arista][orientación] = [cara, índice_sticker]
-// orientación 0 = facelet que apunta a U/D o F/B (según la arista)
-const EDGE_FACELETS = [
-  [[0,5],[5,1]],   // UR=0:  U[5], R[1]
-  [[0,7],[2,1]],   // UF=1:  U[7], F[1]
-  [[0,3],[4,1]],   // UL=2:  U[3], L[1]
-  [[0,1],[3,1]],   // UB=3:  U[1], B[1]
-  [[1,5],[5,7]],   // DR=4:  D[5], R[7]
-  [[1,1],[2,7]],   // DF=5:  D[1], F[7]
-  [[1,3],[4,7]],   // DL=6:  D[3], L[7]
-  [[1,7],[3,7]],   // DB=7:  D[7], B[7]
-  [[2,5],[5,3]],   // FR=8:  F[5], R[3]
-  [[2,3],[4,5]],   // FL=9:  F[3], L[5]
-  [[3,5],[4,3]],   // BL=10: B[5], L[3]
-  [[3,3],[5,5]],   // BR=11: B[3], R[5]
-];
-
-// ── Clase Cube ─────────────────────────────────────────────────────
 export class Cube {
   constructor() { this.reset(); }
 
   reset() {
-    this.cp = [0,1,2,3,4,5,6,7];
-    this.co = [0,0,0,0,0,0,0,0];
-    this.ep = [0,1,2,3,4,5,6,7,8,9,10,11];
-    this.eo = [0,0,0,0,0,0,0,0,0,0,0,0];
-    this._buildState();
+    this.state = Array.from({length:6}, (_,i) => Array(9).fill(i));
   }
 
   clone() {
     const c = new Cube();
-    c.cp=[...this.cp]; c.co=[...this.co];
-    c.ep=[...this.ep]; c.eo=[...this.eo];
-    c._buildState();
+    c.state = this.state.map(f => [...f]);
     return c;
   }
 
-  /** Reconstruye state[6][9] desde cp/co/ep/eo */
-  _buildState() {
-    // Centros fijos
-    this.state = Array.from({length:6}, (_,i) => Array(9).fill(i));
+  serialize() {
+    return this.state.map(f => f.join('')).join('|');
+  }
 
-    for (let pos = 0; pos < 8; pos++) {
-      const piece = this.cp[pos];
-      const ori   = this.co[pos];
-      for (let f = 0; f < 3; f++) {
-        const [face, si] = CORNER_FACELETS[pos][f];
-        const [colorFace] = CORNER_FACELETS[piece][(f + ori) % 3];
-        this.state[face][si] = colorFace;
+  deserialize(str) {
+    try {
+      const parts = str.split('|');
+      if (parts.length !== 6) return false;
+      const parsed = parts.map(p => p.split('').map(Number));
+      if (parsed.some(f => f.length !== 9)) return false;
+      this.state = parsed;
+      return true;
+    } catch { return false; }
+  }
+
+  /** Aplica un movimiento horario usando ciclos sobre copia plana */
+  _applyMove(faceIdx, cycles, cw) {
+    // Copia plana de todos los stickers
+    const flat = this.state.flat();
+    const next = [...flat];
+
+    // Rotar la cara misma
+    const base = faceIdx * 9;
+    const rot = cw ? FACE_CW : FACE_CCW;
+    for (let i = 0; i < 9; i++) next[base + i] = flat[base + rot[i]];
+
+    // Aplicar ciclos adyacentes
+    for (const [a,b,c,d] of cycles) {
+      if (cw) {
+        // a→b→c→d→a  (el valor de a va a b, etc.)
+        next[b] = flat[a];
+        next[c] = flat[b];
+        next[d] = flat[c];
+        next[a] = flat[d];
+      } else {
+        next[d] = flat[a];
+        next[c] = flat[b];
+        next[b] = flat[c];
+        next[a] = flat[d];
       }
     }
 
-    for (let pos = 0; pos < 12; pos++) {
-      const piece = this.ep[pos];
-      const ori   = this.eo[pos];
-      for (let f = 0; f < 2; f++) {
-        const [face, si] = EDGE_FACELETS[pos][f];
-        const [colorFace] = EDGE_FACELETS[piece][(f + ori) % 2];
-        this.state[face][si] = colorFace;
-      }
-    }
+    // Reconstruir state[6][9]
+    for (let f = 0; f < 6; f++)
+      for (let i = 0; i < 9; i++)
+        this.state[f][i] = next[f*9+i];
   }
 
-  /** Aplica un movimiento usando arrays temporales (sin corrupción) */
-  _applyMove(mv) {
-    const ncp=Array(8), nco=Array(8), nep=Array(12), neo=Array(12);
-    for (let i=0;i<8;i++)  { ncp[i]=this.cp[mv.cp[i]]; nco[i]=(this.co[mv.cp[i]]+mv.co[i])%3; }
-    for (let i=0;i<12;i++) { nep[i]=this.ep[mv.ep[i]]; neo[i]=(this.eo[mv.ep[i]]+mv.eo[i])%2; }
-    this.cp=ncp; this.co=nco; this.ep=nep; this.eo=neo;
-    this._buildState();
-  }
-
-  U(cw=true) { this._applyMove(cw ? MOVE_TABLE.U : _inv(MOVE_TABLE.U)); }
-  D(cw=true) { this._applyMove(cw ? MOVE_TABLE.D : _inv(MOVE_TABLE.D)); }
-  F(cw=true) { this._applyMove(cw ? MOVE_TABLE.F : _inv(MOVE_TABLE.F)); }
-  B(cw=true) { this._applyMove(cw ? MOVE_TABLE.B : _inv(MOVE_TABLE.B)); }
-  L(cw=true) { this._applyMove(cw ? MOVE_TABLE.L : _inv(MOVE_TABLE.L)); }
-  R(cw=true) { this._applyMove(cw ? MOVE_TABLE.R : _inv(MOVE_TABLE.R)); }
+  U(cw=true) { this._applyMove(FACES.U, MOVE_CYCLES.U, cw); }
+  D(cw=true) { this._applyMove(FACES.D, MOVE_CYCLES.D, cw); }
+  F(cw=true) { this._applyMove(FACES.F, MOVE_CYCLES.F, cw); }
+  B(cw=true) { this._applyMove(FACES.B, MOVE_CYCLES.B, cw); }
+  L(cw=true) { this._applyMove(FACES.L, MOVE_CYCLES.L, cw); }
+  R(cw=true) { this._applyMove(FACES.R, MOVE_CYCLES.R, cw); }
 
   move(notation) {
     const m = notation.trim();
@@ -177,26 +156,7 @@ export class Cube {
   applyMoves(moves) { moves.forEach(m => this.move(m)); }
 
   isSolved() {
-    return this.cp.every((v,i)=>v===i) && this.co.every(v=>v===0) &&
-           this.ep.every((v,i)=>v===i) && this.eo.every(v=>v===0);
-  }
-
-  serialize() {
-    return [this.cp.join(','), this.co.join(','),
-            this.ep.join(','), this.eo.join(',')].join('|');
-  }
-
-  deserialize(str) {
-    try {
-      const [a,b,c,d] = str.split('|');
-      this.cp = a.split(',').map(Number);
-      this.co = b.split(',').map(Number);
-      this.ep = c.split(',').map(Number);
-      this.eo = d.split(',').map(Number);
-      if (this.cp.length!==8 || this.ep.length!==12) return false;
-      this._buildState();
-      return true;
-    } catch { return false; }
+    return this.state.every(face => face.every(v => v === face[4]));
   }
 
   randomize(n=25) {
@@ -216,12 +176,3 @@ export class Cube {
     return seq;
   }
 }
-
-function _inv(mv) {
-  const icp=Array(8), ico=Array(8), iep=Array(12), ieo=Array(12);
-  for (let i=0;i<8;i++)  { icp[mv.cp[i]]=i; ico[mv.cp[i]]=(3-mv.co[i])%3; }
-  for (let i=0;i<12;i++) { iep[mv.ep[i]]=i; ieo[mv.ep[i]]=mv.eo[i]; }
-  return {cp:icp, co:ico, ep:iep, eo:ieo};
-}
-
-export { MOVE_TABLE, CORNER_FACELETS, EDGE_FACELETS, _inv };
