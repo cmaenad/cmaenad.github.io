@@ -92,8 +92,10 @@ sec('F solo afecta col/fila adyacente de U/D/L/R, no toca B');
 {
   const c=new Cube(); c.move('F');
   log('F: B intacta', faceUntouched(c,3));
-  log('F: col izq U intacta', allSame(col(c,0,0),0) && allSame(col(c,0,1),0));
-  log('F: col der L intacta', allSame(col(c,4,0),4) && allSame(col(c,4,1),4));
+  // F solo toca la FILA INFERIOR de U (índices 6,7,8), no las filas 0 y 1
+  log('F: filas 0 y 1 de U intactas', allSame(row(c,0,0),0) && allSame(row(c,0,1),0));
+  // F solo toca la COL DERECHA de L (índices 2,5,8), no las cols 0 y 1
+  log('F: cols 0 y 1 de L intactas', allSame(col(c,4,0),4) && allSame(col(c,4,1),4));
   log('F: cara F intacta (color)', c.state[2].every(v=>v===2));
 }
 
@@ -238,23 +240,86 @@ sec('Algoritmos clásicos = identidad');
   log('Sune×6', c.isSolved());
 }
 {
-  // T-perm tiene orden 2
   const c=new Cube();
   for(let i=0;i<2;i++) c.applyMoves(['R','U',"R'","U'","R'","F","R2","U'","R'","U'","R","U","R'","F'"]);
-  log('T-perm×2', c.isSolved());
+  log('T-perm×2', c.isSolved(), c.isSolved()?'':'estado='+c.state.map((f,i)=>'UDFBLR'[i]+':'+f.join('')).join(' '));
 }
 {
-  // U-perm tiene orden 3... no, orden 3 no. Verificar con ×6
   const c=new Cube();
   for(let i=0;i<6;i++) c.applyMoves(["R2","U","R","U","R'","U'","R'","U'","R'","U","R'"]);
   log('U-perm×6', c.isSolved());
 }
 {
-  // Superflip: 20 movimientos, orden 2
   const superflip=["U","R2","F","B","R","B2","R","U2","L","B2","R","U'","D'","R2","F","R'","L","B2","U2","F2"];
   const c=new Cube();
   c.applyMoves(superflip); c.applyMoves(superflip);
-  log('Superflip×2', c.isSolved());
+  log('Superflip×2', c.isSolved(), c.isSolved()?'':'estado='+c.state.map((f,i)=>'UDFBLR'[i]+':'+f.join('')).join(' '));
+}
+
+sec('Orden de movimientos individuales (verificación de ciclos)');
+// Cada movimiento tiene un orden conocido: todos los básicos tienen orden 4
+// Combinaciones conocidas:
+{
+  // R F tiene orden 105
+  // Pero R2 F2 tiene orden 6
+  const c=new Cube();
+  for(let i=0;i<6;i++) c.applyMoves(['R2','F2']);
+  log('(R2 F2)×6 = identidad', c.isSolved());
+}
+{
+  // R2 U2 tiene orden 6
+  const c=new Cube();
+  for(let i=0;i<6;i++) c.applyMoves(['R2','U2']);
+  log('(R2 U2)×6 = identidad', c.isSolved());
+}
+{
+  // F R tiene orden 105, pero F2 R2 tiene orden 6
+  const c=new Cube();
+  for(let i=0;i<6;i++) c.applyMoves(['F2','R2']);
+  log('(F2 R2)×6 = identidad', c.isSolved());
+}
+{
+  // R U2 R' U' R U2 L' U R' U' L tiene orden 3
+  const alg=["R","U2","R'","U'","R","U2","L'","U","R'","U'","L"];
+  const c=new Cube();
+  for(let i=0;i<3;i++) c.applyMoves(alg);
+  log('Niklas×3 = identidad', c.isSolved());
+}
+{
+  // F R U R' U' F' tiene orden 6 (OLL)
+  const c=new Cube();
+  for(let i=0;i<6;i++) c.applyMoves(['F','R','U',"R'","U'","F'"]);
+  log('(F R U R\' U\' F\')×6 = identidad', c.isSolved());
+}
+{
+  // R U R' U R U2 R' (Sune) tiene orden 6
+  const c=new Cube();
+  for(let i=0;i<6;i++) c.applyMoves(['R','U',"R'","U","R","U2","R'"]);
+  log('Sune×6 = identidad', c.isSolved());
+}
+{
+  // Verificar T-perm paso a paso: aislar qué movimiento falla
+  // T-perm: R U R' U' R' F R2 U' R' U' R U R' F'
+  // Aplicar una vez y verificar que no es identidad (debería no serlo)
+  const c=new Cube();
+  c.applyMoves(['R','U',"R'","U'","R'","F","R2","U'","R'","U'","R","U","R'","F'"]);
+  log('T-perm×1 ≠ identidad (esperado)', !c.isSolved());
+  // Aplicar segunda vez
+  c.applyMoves(['R','U',"R'","U'","R'","F","R2","U'","R'","U'","R","U","R'","F'"]);
+  log('T-perm×2 = identidad', c.isSolved(), c.isSolved()?'':'estado='+c.state.map((f,i)=>'UDFBLR'[i]+':'+f.join('')).join(' '));
+}
+{
+  // Aislar: ¿F solo es correcto?
+  // F R F' R' tiene orden 6
+  const c=new Cube();
+  for(let i=0;i<6;i++) c.applyMoves(['F','R',"F'","R'"]);
+  log('(F R F\' R\')×6 = identidad', c.isSolved());
+}
+{
+  // R' F R F' tiene orden 6
+  const c=new Cube();
+  for(let i=0;i<6;i++) c.applyMoves(["R'","F","R","F'"]);
+  log("(R' F R F')×6 = identidad", c.isSolved());
 }
 
 // ── SECCIÓN 6: Invertir mezcla ────────────────────────────────────
