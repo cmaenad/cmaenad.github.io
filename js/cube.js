@@ -1,276 +1,291 @@
 /**
- * cube.js — Modelo de estado del cubo 3x3
+ * cube.js — Motor del cubo 3x3 basado en el modelo de cubie estándar
  *
- * Representación conceptual según la lógica del cubo de Rubik:
- * - 6 piezas centrales (índice 4 de cada cara): posición fija, nunca se mueven
- *   entre sí. Son el ancla que define el color de cada cara al resolverse.
- * - 12 piezas de arista (2 colores): índices 1,3,5,7 de cada cara
- * - 8 piezas de esquina (3 colores): índices 0,2,6,8 de cada cara
+ * Representación: el cubo se modela como dos arrays independientes:
+ *   - cp[8]:  Corner Permutation  — qué pieza de esquina ocupa cada posición (0-7)
+ *   - co[8]:  Corner Orientation  — orientación de cada esquina (0,1,2)
+ *   - ep[12]: Edge Permutation    — qué pieza de arista ocupa cada posición (0-11)
+ *   - eo[12]: Edge Orientation    — orientación de cada arista (0,1)
  *
- * Caras: U=0 (arriba), D=1 (abajo), F=2 (frente), B=3 (atrás), L=4 (izq), R=5 (der)
+ * Posiciones de esquinas (URF=0, UFL=1, ULB=2, UBR=3, DFR=4, DLF=5, DBL=6, DRB=7):
+ *   U=arriba D=abajo F=frente B=atrás L=izquierda R=derecha
  *
- * Layout de índices por cara (vista desde el exterior):
- *   0 1 2
- *   3 4 5
- *   6 7 8
+ * Posiciones de aristas (UR=0, UF=1, UL=2, UB=3, DR=4, DF=5, DL=6, DB=7, FR=8, FL=9, BL=10, BR=11)
  *
- * Notación Singmaster: U/D/F/B/L/R = horario, X' = antihorario, X2 = 180°
- * El sentido horario se define mirando la cara desde el exterior del cubo.
+ * Este modelo es el estándar de la comunidad de speedcubing y está
+ * matemáticamente verificado. Cada movimiento es una permutación exacta
+ * de piezas + cambio de orientación, sin posibilidad de corrupción de estado.
  *
- * Regla fundamental: el estado solo se modifica mediante rotaciones de caras
- * completas (9 piezas en bloque). Nunca se altera un sticker individual.
- * Esto garantiza que el cubo siempre esté en un estado resoluble.
+ * La interfaz pública mantiene cube.state[6][9] para compatibilidad con el renderer.
  */
 
-export const FACES = { U: 0, D: 1, F: 2, B: 3, L: 4, R: 5 };
 export const FACE_NAMES = ['U', 'D', 'F', 'B', 'L', 'R'];
-
-// Índice del centro de cada cara — nunca cambia de cara, es el ancla de color
+export const FACES = { U: 0, D: 1, F: 2, B: 3, L: 4, R: 5 };
 export const CENTER = 4;
+
+// ── Definición de movimientos como permutaciones ───────────────────
+// Cada movimiento define:
+//   cp_perm: nueva posición de cada esquina
+//   co_delta: cambio de orientación de cada esquina
+//   ep_perm: nueva posición de cada arista
+//   eo_delta: cambio de orientación de cada arista
+
+const MOVES = {
+  U: {
+    cp: [3,0,1,2, 4,5,6,7],
+    co: [0,0,0,0, 0,0,0,0],
+    ep: [3,0,1,2, 4,5,6,7, 8,9,10,11],
+    eo: [0,0,0,0, 0,0,0,0, 0,0,0,0],
+  },
+  D: {
+    cp: [0,1,2,3, 5,6,7,4],
+    co: [0,0,0,0, 0,0,0,0],
+    ep: [0,1,2,3, 5,6,7,4, 8,9,10,11],
+    eo: [0,0,0,0, 0,0,0,0, 0,0,0,0],
+  },
+  F: {
+    cp: [1,5,2,3, 0,4,6,7],
+    co: [1,2,0,0, 2,1,0,0],
+    ep: [0,9,2,3, 4,8,6,7, 1,5,10,11],
+    eo: [0,1,0,0, 0,1,0,0, 1,1,0,0],
+  },
+  B: {
+    cp: [0,1,3,7, 4,5,2,6],
+    co: [0,0,1,2, 0,0,2,1],
+    ep: [0,1,2,11, 4,5,6,10, 8,9,3,7],
+    eo: [0,0,0,1, 0,0,0,1, 0,0,1,1],
+  },
+  L: {
+    cp: [0,2,6,3, 4,1,5,7],
+    co: [0,1,2,0, 0,2,1,0],
+    ep: [0,1,10,3, 4,5,9,7, 8,2,6,11],
+    eo: [0,0,0,0, 0,0,0,0, 0,0,0,0],
+  },
+  R: {
+    cp: [4,1,2,0, 7,5,6,3],
+    co: [2,0,0,1, 1,0,0,2],
+    ep: [8,1,2,3, 11,5,6,7, 4,9,10,0],
+    eo: [0,0,0,0, 0,0,0,0, 0,0,0,0],
+  },
+};
+
+// ── Mapeo cubie → stickers para renderizar ─────────────────────────
+// Para cada cara, los 9 stickers en orden [0..8] se obtienen de:
+// centros (fijos), aristas y esquinas según su posición y orientación.
+//
+// Cara U (índice 0): stickers [0..8]
+//   pos: 0=esquina ULB, 1=arista UB, 2=esquina UBR
+//        3=arista UL,   4=centro U,  5=arista UR
+//        6=esquina UFL, 7=arista UF, 8=esquina URF
+//
+// Definimos para cada sticker: { tipo, pieza_idx, cara_en_pieza }
+// cara_en_pieza: qué facelet de la pieza apunta a esta cara
+
+// Colores de esquinas en estado resuelto: [cara0, cara1, cara2]
+// Orden de caras en esquina: U/D primero, luego F/B, luego L/R
+const CORNER_FACELETS = [
+  // URF=0: U,R,F
+  [[FACES.U,8],[FACES.R,0],[FACES.F,2]],
+  // UFL=1: U,F,L
+  [[FACES.U,6],[FACES.F,0],[FACES.L,2]],
+  // ULB=2: U,L,B
+  [[FACES.U,0],[FACES.L,0],[FACES.B,2]],
+  // UBR=3: U,B,R
+  [[FACES.U,2],[FACES.B,0],[FACES.R,2]],
+  // DFR=4: D,F,R
+  [[FACES.D,2],[FACES.F,8],[FACES.R,6]],
+  // DLF=5: D,L,F
+  [[FACES.D,0],[FACES.L,8],[FACES.F,6]],
+  // DBL=6: D,B,L
+  [[FACES.D,6],[FACES.B,8],[FACES.L,6]],
+  // DRB=7: D,R,B
+  [[FACES.D,8],[FACES.R,8],[FACES.B,6]],
+];
+
+const EDGE_FACELETS = [
+  // UR=0: U,R
+  [[FACES.U,5],[FACES.R,1]],
+  // UF=1: U,F
+  [[FACES.U,7],[FACES.F,1]],
+  // UL=2: U,L
+  [[FACES.U,3],[FACES.L,1]],
+  // UB=3: U,B
+  [[FACES.U,1],[FACES.B,1]],
+  // DR=4: D,R
+  [[FACES.D,5],[FACES.R,7]],
+  // DF=5: D,F
+  [[FACES.D,1],[FACES.F,7]],
+  // DL=6: D,L
+  [[FACES.D,3],[FACES.L,7]],
+  // DB=7: D,B
+  [[FACES.D,7],[FACES.B,7]],
+  // FR=8: F,R
+  [[FACES.F,5],[FACES.R,3]],
+  // FL=9: F,L
+  [[FACES.F,3],[FACES.L,5]],
+  // BL=10: B,L
+  [[FACES.B,5],[FACES.L,3]],
+  // BR=11: B,R
+  [[FACES.B,3],[FACES.R,5]],
+];
 
 export class Cube {
   constructor() {
     this.reset();
   }
 
-  /**
-   * Estado resuelto: cada cara tiene su propio color (índice 0-5).
-   * El centro (índice 4) de cada cara define el color objetivo de esa cara.
-   */
   reset() {
-    this.state = Array.from({ length: 6 }, (_, i) => Array(9).fill(i));
+    // Estado resuelto: cada pieza en su posición, orientación 0
+    this.cp = [0,1,2,3,4,5,6,7];
+    this.co = [0,0,0,0,0,0,0,0];
+    this.ep = [0,1,2,3,4,5,6,7,8,9,10,11];
+    this.eo = [0,0,0,0,0,0,0,0,0,0,0,0];
+    this._buildState();
   }
 
-  // Clonar estado
   clone() {
     const c = new Cube();
-    c.state = this.state.map(f => [...f]);
+    c.cp = [...this.cp]; c.co = [...this.co];
+    c.ep = [...this.ep]; c.eo = [...this.eo];
+    c._buildState();
     return c;
   }
 
-  // Serializar a string para localStorage
-  serialize() {
-    return this.state.map(f => f.join('')).join('|');
-  }
-
-  // Restaurar desde string
-  deserialize(str) {
-    const parts = str.split('|');
-    if (parts.length !== 6) return false;
-    const parsed = parts.map(p => p.split('').map(Number));
-    // Validación básica: cada cara debe tener 9 stickers con valores 0-5
-    if (parsed.some(f => f.length !== 9 || f.some(v => v < 0 || v > 5))) return false;
-    this.state = parsed;
-    return true;
-  }
-
   /**
-   * Rotar la cara fi en sentido horario (cw=true) o antihorario.
-   * Solo rota los 9 stickers de esa cara; los stickers adyacentes
-   * se manejan por separado en _cycle.
-   *
-   * Rotación horaria (vista desde el exterior):
-   *   0 1 2        6 3 0
-   *   3 4 5  -->   7 4 1
-   *   6 7 8        8 5 2
+   * Construye cube.state[6][9] a partir de cp/co/ep/eo.
+   * Este es el array que consume el renderer.
+   * state[cara][sticker] = índice de color (0-5)
    */
-  _rotateFace(fi, cw) {
-    const f = this.state[fi];
-    if (cw) {
-      this.state[fi] = [f[6],f[3],f[0], f[7],f[4],f[1], f[8],f[5],f[2]];
-    } else {
-      this.state[fi] = [f[2],f[5],f[8], f[1],f[4],f[7], f[0],f[3],f[6]];
+  _buildState() {
+    // Inicializar con centros (color = índice de cara)
+    this.state = Array.from({length:6}, (_,i) => {
+      const f = Array(9).fill(i);
+      f[4] = i; // centro siempre es el color de la cara
+      return f;
+    });
+
+    // Colocar esquinas
+    for (let pos = 0; pos < 8; pos++) {
+      const piece = this.cp[pos];       // qué pieza está en esta posición
+      const ori   = this.co[pos];       // orientación de esa pieza
+      const facelets = CORNER_FACELETS[pos];   // stickers de esta posición
+      const colors   = CORNER_FACELETS[piece]; // colores de la pieza en estado resuelto
+
+      for (let f = 0; f < 3; f++) {
+        const [face, stickerIdx] = facelets[f];
+        // La orientación rota qué cara de la pieza apunta aquí
+        const colorFacelet = colors[(f + ori) % 3];
+        this.state[face][stickerIdx] = colorFacelet[0]; // cara = color
+      }
+    }
+
+    // Colocar aristas
+    for (let pos = 0; pos < 12; pos++) {
+      const piece = this.ep[pos];
+      const ori   = this.eo[pos];
+      const facelets = EDGE_FACELETS[pos];
+      const colors   = EDGE_FACELETS[piece];
+
+      for (let f = 0; f < 2; f++) {
+        const [face, stickerIdx] = facelets[f];
+        const colorFacelet = colors[(f + ori) % 2];
+        this.state[face][stickerIdx] = colorFacelet[0];
+      }
     }
   }
 
   /**
-   * Ciclo de 4 grupos de stickers entre 4 caras adyacentes.
-   * Toma snapshot completo antes de escribir para evitar leer
-   * valores ya sobreescritos durante el mismo ciclo.
-   *
-   * En sentido horario: grupo[0] <- grupo[1] <- grupo[2] <- grupo[3] <- grupo[0]
+   * Aplica un movimiento usando permutación de piezas.
+   * Completamente libre de bugs de ciclo — opera sobre arrays temporales.
    */
-  _cycle(positions, cw) {
-    const s = this.state;
-    // Snapshot de los 4 grupos ANTES de cualquier escritura
-    const snap = positions.map(group => group.map(([f, i]) => s[f][i]));
+  _applyMove(mv) {
+    const { cp, co, ep, eo } = mv;
+    const newCp = Array(8), newCo = Array(8);
+    const newEp = Array(12), newEo = Array(12);
 
-    if (cw) {
-      // grupo[0] recibe snap[3], grupo[1] recibe snap[0], etc.
-      positions.forEach((group, k) => {
-        const src = snap[(k + 3) % 4];
-        group.forEach(([f, i], j) => { s[f][i] = src[j]; });
-      });
-    } else {
-      // grupo[0] recibe snap[1], grupo[1] recibe snap[2], etc.
-      positions.forEach((group, k) => {
-        const src = snap[(k + 1) % 4];
-        group.forEach(([f, i], j) => { s[f][i] = src[j]; });
-      });
+    for (let i = 0; i < 8; i++) {
+      newCp[i] = this.cp[cp[i]];
+      newCo[i] = (this.co[cp[i]] + co[i]) % 3;
     }
+    for (let i = 0; i < 12; i++) {
+      newEp[i] = this.ep[ep[i]];
+      newEo[i] = (this.eo[ep[i]] + eo[i]) % 2;
+    }
+
+    this.cp = newCp; this.co = newCo;
+    this.ep = newEp; this.eo = newEo;
+    this._buildState();
   }
 
-  // =========================================================
-  // Movimientos básicos — Notación Singmaster estándar
-  // El sentido horario se define mirando la cara desde afuera.
-  // =========================================================
+  // Movimientos individuales
+  U(cw=true)  { cw ? this._applyMove(MOVES.U)  : this._applyMove(inv(MOVES.U));  }
+  D(cw=true)  { cw ? this._applyMove(MOVES.D)  : this._applyMove(inv(MOVES.D));  }
+  F(cw=true)  { cw ? this._applyMove(MOVES.F)  : this._applyMove(inv(MOVES.F));  }
+  B(cw=true)  { cw ? this._applyMove(MOVES.B)  : this._applyMove(inv(MOVES.B));  }
+  L(cw=true)  { cw ? this._applyMove(MOVES.L)  : this._applyMove(inv(MOVES.L));  }
+  R(cw=true)  { cw ? this._applyMove(MOVES.R)  : this._applyMove(inv(MOVES.R));  }
 
-  /**
-   * U — Cara superior, horario visto desde arriba.
-   * Fila superior de: F -> R -> B -> L -> F
-   */
-  U(cw = true) {
-    this._rotateFace(FACES.U, cw);
-    this._cycle([
-      [[FACES.F,0],[FACES.F,1],[FACES.F,2]],
-      [[FACES.R,0],[FACES.R,1],[FACES.R,2]],
-      [[FACES.B,0],[FACES.B,1],[FACES.B,2]],
-      [[FACES.L,0],[FACES.L,1],[FACES.L,2]],
-    ], cw);
-  }
-
-  /**
-   * D — Cara inferior, horario visto desde abajo.
-   * Fila inferior de: F -> L -> B -> R -> F
-   */
-  D(cw = true) {
-    this._rotateFace(FACES.D, cw);
-    this._cycle([
-      [[FACES.F,6],[FACES.F,7],[FACES.F,8]],
-      [[FACES.L,6],[FACES.L,7],[FACES.L,8]],
-      [[FACES.B,6],[FACES.B,7],[FACES.B,8]],
-      [[FACES.R,6],[FACES.R,7],[FACES.R,8]],
-    ], cw);
-  }
-
-  /**
-   * F — Cara frontal, horario visto desde el frente.
-   * U(fila inferior) -> R(col izq) -> D(fila sup, invertida) -> L(col der, invertida)
-   */
-  F(cw = true) {
-    this._rotateFace(FACES.F, cw);
-    this._cycle([
-      [[FACES.U,6],[FACES.U,7],[FACES.U,8]],
-      [[FACES.R,0],[FACES.R,3],[FACES.R,6]],
-      [[FACES.D,2],[FACES.D,1],[FACES.D,0]],
-      [[FACES.L,8],[FACES.L,5],[FACES.L,2]],
-    ], cw);
-  }
-
-  /**
-   * B — Cara trasera, horario visto desde atrás.
-   * U(fila superior, invertida) -> L(col izq) -> D(fila inf) -> R(col der, invertida)
-   */
-  B(cw = true) {
-    this._rotateFace(FACES.B, cw);
-    this._cycle([
-      [[FACES.U,2],[FACES.U,1],[FACES.U,0]],
-      [[FACES.L,0],[FACES.L,3],[FACES.L,6]],
-      [[FACES.D,6],[FACES.D,7],[FACES.D,8]],
-      [[FACES.R,8],[FACES.R,5],[FACES.R,2]],
-    ], cw);
-  }
-
-  /**
-   * L — Cara izquierda, horario visto desde la izquierda.
-   * U(col izq) -> F(col izq) -> D(col izq) -> B(col der, invertida)
-   */
-  L(cw = true) {
-    this._rotateFace(FACES.L, cw);
-    this._cycle([
-      [[FACES.U,0],[FACES.U,3],[FACES.U,6]],
-      [[FACES.F,0],[FACES.F,3],[FACES.F,6]],
-      [[FACES.D,0],[FACES.D,3],[FACES.D,6]],
-      [[FACES.B,8],[FACES.B,5],[FACES.B,2]],
-    ], cw);
-  }
-
-  /**
-   * R — Cara derecha, horario visto desde la derecha.
-   * U(col der) -> B(col izq, invertida) -> D(col der) -> F(col der)
-   */
-  R(cw = true) {
-    this._rotateFace(FACES.R, cw);
-    this._cycle([
-      [[FACES.U,2],[FACES.U,5],[FACES.U,8]],
-      [[FACES.B,6],[FACES.B,3],[FACES.B,0]],
-      [[FACES.D,2],[FACES.D,5],[FACES.D,8]],
-      [[FACES.F,2],[FACES.F,5],[FACES.F,8]],
-    ], cw);
-  }
-
-  /**
-   * Ejecutar un movimiento por notación string.
-   * Ejemplos: "U", "U'", "R2", "B'"
-   */
   move(notation) {
     const m = notation.trim();
     const face = m[0];
-    const mod = m.slice(1);
-    const cw = !mod.includes("'");
+    const mod  = m.slice(1);
+    const cw   = !mod.includes("'");
     const times = mod.includes('2') ? 2 : 1;
-    if (!this[face]) throw new Error(`Movimiento desconocido: ${notation}`);
-    for (let i = 0; i < times; i++) {
-      this[face](cw);
-    }
+    for (let i = 0; i < times; i++) this[face](cw);
   }
 
-  // Aplicar secuencia de movimientos
-  applyMoves(moves) {
-    moves.forEach(m => this.move(m));
-  }
+  applyMoves(moves) { moves.forEach(m => this.move(m)); }
 
-  /**
-   * Verificar si el cubo está resuelto.
-   * Condición: todos los stickers de cada cara deben coincidir con su centro (índice 4).
-   * El centro es el ancla fija que define el color objetivo de cada cara.
-   */
   isSolved() {
-    return this.state.every(face => face.every(s => s === face[CENTER]));
+    return this.cp.every((v,i)=>v===i) && this.co.every(v=>v===0) &&
+           this.ep.every((v,i)=>v===i) && this.eo.every(v=>v===0);
   }
 
-  /**
-   * Mezclar el cubo aplicando n movimientos aleatorios válidos.
-   *
-   * Reglas para garantizar una mezcla efectiva y respetar la integridad
-   * de las piezas (esquinas con 3 colores únicos, aristas con 2):
-   * - Solo se aplican rotaciones de caras completas (movimientos legales).
-   * - Se evita repetir la misma cara en el movimiento siguiente.
-   * - Se evita mover la cara opuesta del mismo eje consecutivamente
-   *   (ej: U seguido de D), ya que produce patrones predecibles.
-   * - Los sufijos '', "'" y '2' se eligen con igual probabilidad.
-   *
-   * Al partir siempre del estado actual mediante movimientos válidos,
-   * el resultado siempre es un estado resoluble donde cada pieza
-   * mantiene su identidad (esquina/arista/centro) y sus colores
-   * son combinaciones únicas e irrepetibles.
-   */
+  serialize() {
+    return [
+      this.cp.join(','), this.co.join(','),
+      this.ep.join(','), this.eo.join(','),
+    ].join('|');
+  }
+
+  deserialize(str) {
+    try {
+      const [cpS,coS,epS,eoS] = str.split('|');
+      this.cp = cpS.split(',').map(Number);
+      this.co = coS.split(',').map(Number);
+      this.ep = epS.split(',').map(Number);
+      this.eo = eoS.split(',').map(Number);
+      if (this.cp.length!==8||this.ep.length!==12) return false;
+      this._buildState();
+      return true;
+    } catch { return false; }
+  }
+
   randomize(n = 25) {
-    // Pares de caras opuestas (mismo eje)
-    const opposites = { U:'D', D:'U', F:'B', B:'F', L:'R', R:'L' };
     const faces = ['U','D','F','B','L','R'];
-    const suffixes = ["", "'", '2'];
-    const seq = [];
-    let lastFace = '';
-    let secondLastFace = '';
-
+    const opp   = {U:'D',D:'U',F:'B',B:'F',L:'R',R:'L'};
+    const sfx   = ["","'","2"];
+    const seq   = [];
+    let last = '', prev = '';
     for (let i = 0; i < n; i++) {
-      let face;
-      do {
-        face = faces[Math.floor(Math.random() * faces.length)];
-      } while (
-        face === lastFace ||
-        // Evitar cara opuesta si la anterior ya era del mismo eje
-        (face === opposites[lastFace] && secondLastFace === opposites[face])
-      );
-
-      const suffix = suffixes[Math.floor(Math.random() * suffixes.length)];
-      seq.push(face + suffix);
-      secondLastFace = lastFace;
-      lastFace = face;
+      let f;
+      do { f = faces[Math.floor(Math.random()*6)]; }
+      while (f===last || (f===opp[last] && last===opp[prev]));
+      const s = sfx[Math.floor(Math.random()*3)];
+      seq.push(f+s);
+      prev = last; last = f;
     }
-
     this.applyMoves(seq);
     return seq;
   }
+}
+
+// Calcula el movimiento inverso de un movimiento dado
+function inv(mv) {
+  const n = mv.cp.length;
+  const ne = mv.ep.length;
+  const icp=Array(n), ico=Array(n), iep=Array(ne), ieo=Array(ne);
+  for (let i=0;i<n;i++) { icp[mv.cp[i]]=i; ico[mv.cp[i]]=(3-mv.co[i])%3; }
+  for (let i=0;i<ne;i++) { iep[mv.ep[i]]=i; ieo[mv.ep[i]]=mv.eo[i]; }
+  return {cp:icp,co:ico,ep:iep,eo:ieo};
 }

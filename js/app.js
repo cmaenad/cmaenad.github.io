@@ -135,7 +135,10 @@ function handleRandomize() {
 }
 
 function handleReset() {
-  if (solveAnimating) return;
+  // Reset siempre funciona, incluso si el solver estaba corriendo
+  solveAnimating = false;
+  btnSolve.disabled = false;
+  btnSolve.textContent = '✨ Resolver';
   cube.reset();
   renderCube(cube, colorsRef.value);
   saveState();
