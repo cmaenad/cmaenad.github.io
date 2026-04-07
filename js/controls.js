@@ -1,22 +1,10 @@
 /**
- * controls.js — Botones de rotación de vista, flechas de movimiento,
- * randomizar, resolver y reiniciar. También maneja touch/swipe.
- *
- * IMPORTANTE: colors se pasa como objeto contenedor { value: [] } para que
- * las flechas siempre lean el array actualizado, no una copia vacía inicial.
+ * controls.js — Controles de vista, teclado, swipe y botones de acción.
+ * Los movimientos de cara se manejan directamente desde los botones
+ * centrales de cada cara 3D (ver renderer.js → initRenderer).
  */
 
-import { rotateView, renderCube, applyViewRotation } from './renderer.js';
-
-// Flechas visibles sobre el cubo
-// click izquierdo = CW, click derecho / long-press = CCW
-const ARROWS = [
-  { id: 'U-row', top: '8%',  left: '50%', symbol: '↑', moveCW: 'U',  moveCCW: "U'" },
-  { id: 'D-row', top: '92%', left: '50%', symbol: '↓', moveCW: 'D',  moveCCW: "D'" },
-  { id: 'L-col', top: '50%', left: '8%',  symbol: '←', moveCW: 'L',  moveCCW: "L'" },
-  { id: 'R-col', top: '50%', left: '92%', symbol: '→', moveCW: 'R',  moveCCW: "R'" },
-  { id: 'F-cw',  top: '50%', left: '50%', symbol: '↻', moveCW: 'F',  moveCCW: "F'" },
-];
+import { rotateView, renderCube } from './renderer.js';
 
 // Teclas: minúscula = horario, mayúscula = antihorario
 const KEY_MAP = {
@@ -28,16 +16,6 @@ const KEY_MAP = {
   'r': 'R',  'R': "R'",
 };
 
-/**
- * @param {object} opts
- * @param {Cube}   opts.cube        — instancia del cubo
- * @param {object} opts.colorsRef   — { value: string[] } referencia mutable a los colores
- * @param {function} opts.onMove    — callback tras cada movimiento
- * @param {function} opts.onRandomize
- * @param {function} opts.onSolve
- * @param {function} opts.onReset
- * @param {HTMLElement} opts.containerEl — #cube-container para rotación de vista
- */
 export function initControls({ cube, colorsRef, onMove, onRandomize, onSolve, onReset, containerEl }) {
 
   // ── Rotación de vista ──────────────────────────────────────────────
@@ -46,42 +24,6 @@ export function initControls({ cube, colorsRef, onMove, onRandomize, onSolve, on
       rotateView(btn.dataset.rot, containerEl);
       onMove(null);
     });
-  });
-
-  // ── Flechas de movimiento ──────────────────────────────────────────
-  const arrowsEl = document.getElementById('move-arrows');
-
-  ARROWS.forEach(arrow => {
-    const btn = document.createElement('button');
-    btn.className = 'move-arrow';
-    btn.setAttribute('aria-label', `${arrow.moveCW} / ${arrow.moveCCW}`);
-    btn.title = `Click: ${arrow.moveCW}  |  Click derecho: ${arrow.moveCCW}`;
-    btn.innerHTML = arrow.symbol;
-    btn.style.cssText = `top:${arrow.top};left:${arrow.left};transform:translate(-50%,-50%)`;
-
-    const doMove = (notation) => {
-      cube.move(notation);
-      renderCube(cube, colorsRef.value);
-      onMove(notation);
-    };
-
-    btn.addEventListener('click', (e) => { e.preventDefault(); doMove(arrow.moveCW); });
-    btn.addEventListener('contextmenu', (e) => { e.preventDefault(); doMove(arrow.moveCCW); });
-
-    // Long-press en móvil = movimiento inverso
-    let pressTimer = null;
-    btn.addEventListener('touchstart', (e) => {
-      pressTimer = setTimeout(() => {
-        e.preventDefault();
-        doMove(arrow.moveCCW);
-        pressTimer = null;
-      }, 400);
-    }, { passive: true });
-    btn.addEventListener('touchend', () => {
-      if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; }
-    });
-
-    arrowsEl.appendChild(btn);
   });
 
   // ── Botones de acción ──────────────────────────────────────────────
@@ -99,7 +41,8 @@ export function initControls({ cube, colorsRef, onMove, onRandomize, onSolve, on
     }
   });
 
-  // ── Swipe táctil ──────────────────────────────────────────────────
+  // ── Swipe táctil sobre la escena ──────────────────────────────────
+  // Permite rotar la vista arrastrando fuera de los botones de cara
   const scene = document.getElementById('scene-wrapper');
   let startX = 0, startY = 0;
 
@@ -112,11 +55,12 @@ export function initControls({ cube, colorsRef, onMove, onRandomize, onSolve, on
     const dx = e.changedTouches[0].clientX - startX;
     const dy = e.changedTouches[0].clientY - startY;
     if (Math.max(Math.abs(dx), Math.abs(dy)) < 40) return;
-    const m = Math.abs(dx) > Math.abs(dy)
-      ? (dx > 0 ? 'R' : "R'")
-      : (dy > 0 ? 'D' : "D'");
-    cube.move(m);
-    renderCube(cube, colorsRef.value);
-    onMove(m);
+    // Swipe horizontal = rotar vista izq/der, vertical = arriba/abajo
+    if (Math.abs(dx) > Math.abs(dy)) {
+      rotateView(dx > 0 ? 'rotateRight' : 'rotateLeft', containerEl);
+    } else {
+      rotateView(dy > 0 ? 'rotateDown' : 'rotateUp', containerEl);
+    }
+    onMove(null);
   }, { passive: true });
 }

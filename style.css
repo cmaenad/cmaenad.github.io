@@ -150,35 +150,46 @@ html, body {
 .sticker {
   border-radius: 4px;
   transition: background-color 0.2s;
+  position: relative;
 }
 
-/* ===== Flechas de movimiento ===== */
-#move-arrows {
+/* ===== Botón de movimiento en el centro de cada cara ===== */
+.face-move-btn {
   position: absolute;
   inset: 0;
-  pointer-events: none;
-}
-.move-arrow {
-  position: absolute;
-  width: var(--arrow-size);
-  height: var(--arrow-size);
+  width: 100%;
+  height: 100%;
   border: none;
-  border-radius: 50%;
-  background: rgba(255,255,255,0.15);
+  border-radius: 4px;
+  background: rgba(0,0,0,0.28);
   color: #fff;
-  font-size: 1rem;
   cursor: pointer;
-  pointer-events: all;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  transition: background 0.15s;
+  gap: 1px;
   -webkit-tap-highlight-color: transparent;
-  backdrop-filter: blur(4px);
+  transition: background 0.15s;
+  z-index: 2;
 }
-.move-arrow:hover, .move-arrow:active {
-  background: rgba(233,69,96,0.7);
+.face-move-btn:hover,
+.face-move-btn:active {
+  background: rgba(233,69,96,0.75);
 }
+.face-btn-symbol {
+  font-size: 1.1rem;
+  line-height: 1;
+}
+.face-btn-label {
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 1px;
+  opacity: 0.9;
+}
+
+/* ===== Flechas flotantes (vacío, se mantiene por compatibilidad) ===== */
+#move-arrows { display: none; }
 
 /* ===== Botones de acción ===== */
 #bottom-controls {

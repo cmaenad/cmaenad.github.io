@@ -24,7 +24,12 @@ const countryInfo = document.getElementById('country-info');
 const btnSolve    = document.getElementById('btn-solve');
 
 // ── Renderer ────────────────────────────────────────────────────────
-initRenderer(cubeEl);
+// onFaceMove: callback que recibe (faceName, cw) desde el botón central de cada cara
+initRenderer(cubeEl, (faceName, cw) => {
+  cube.move(cw ? faceName : `${faceName}'`);
+  renderCube(cube, colorsRef.value);
+  saveState();
+});
 
 // ── Persistencia ────────────────────────────────────────────────────
 function saveState() {

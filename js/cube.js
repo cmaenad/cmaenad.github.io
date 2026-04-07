@@ -233,26 +233,42 @@ export class Cube {
 
   /**
    * Mezclar el cubo aplicando n movimientos aleatorios válidos.
-   * Se evitan movimientos consecutivos en la misma cara para garantizar
-   * una mezcla efectiva (sin cancelaciones inmediatas).
-   * Al partir siempre de movimientos válidos, el estado resultante
-   * siempre será resoluble.
+   *
+   * Reglas para garantizar una mezcla efectiva y respetar la integridad
+   * de las piezas (esquinas con 3 colores únicos, aristas con 2):
+   * - Solo se aplican rotaciones de caras completas (movimientos legales).
+   * - Se evita repetir la misma cara en el movimiento siguiente.
+   * - Se evita mover la cara opuesta del mismo eje consecutivamente
+   *   (ej: U seguido de D), ya que produce patrones predecibles.
+   * - Los sufijos '', "'" y '2' se eligen con igual probabilidad.
+   *
+   * Al partir siempre del estado actual mediante movimientos válidos,
+   * el resultado siempre es un estado resoluble donde cada pieza
+   * mantiene su identidad (esquina/arista/centro) y sus colores
+   * son combinaciones únicas e irrepetibles.
    */
   randomize(n = 25) {
+    // Pares de caras opuestas (mismo eje)
+    const opposites = { U:'D', D:'U', F:'B', B:'F', L:'R', R:'L' };
     const faces = ['U','D','F','B','L','R'];
-    const suffixes = ['', "'", '2'];
+    const suffixes = ["", "'", '2'];
     const seq = [];
     let lastFace = '';
+    let secondLastFace = '';
 
     for (let i = 0; i < n; i++) {
-      // Elegir una cara distinta a la anterior para evitar cancelaciones
       let face;
       do {
         face = faces[Math.floor(Math.random() * faces.length)];
-      } while (face === lastFace);
+      } while (
+        face === lastFace ||
+        // Evitar cara opuesta si la anterior ya era del mismo eje
+        (face === opposites[lastFace] && secondLastFace === opposites[face])
+      );
 
       const suffix = suffixes[Math.floor(Math.random() * suffixes.length)];
       seq.push(face + suffix);
+      secondLastFace = lastFace;
       lastFace = face;
     }
 

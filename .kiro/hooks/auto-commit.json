@@ -1,0 +1,12 @@
+{
+  "name": "Auto-commit tras cada respuesta",
+  "version": "1.0.0",
+  "description": "Hace commit y push automático de todos los cambios después de que el agente termina de responder",
+  "when": {
+    "type": "agentStop"
+  },
+  "then": {
+    "type": "runCommand",
+    "command": "git -C \"c:\\Users\\adria\\JuegoTalentLand\\cmaenad.github.io\" add . ; git -C \"c:\\Users\\adria\\JuegoTalentLand\\cmaenad.github.io\" diff --cached --quiet || git -C \"c:\\Users\\adria\\JuegoTalentLand\\cmaenad.github.io\" commit -m \"chore: auto-commit agente\" ; git -C \"c:\\Users\\adria\\JuegoTalentLand\\cmaenad.github.io\" push"
+  }
+}
