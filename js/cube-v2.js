@@ -9,8 +9,9 @@
  *   3 4 5
  *   6 7 8
  *
- * Ciclos y lógica de applyMove copiados directamente de solver-v2.js,
- * que es la referencia verificada y correcta.
+ * Los movimientos se aplican directamente sobre el estado (sin tabla de
+ * permutación intermedia) usando ciclos de 4 posiciones.
+ * Ciclo horario [a,b,c,d]: tmp=d, d=c, c=b, b=a, a=tmp  (a←d←c←b←a)
  */
 
 export const FACE_NAMES = ['U','D','F','B','L','R'];
@@ -18,42 +19,95 @@ export const FACES = { U:0, D:1, F:2, B:3, L:4, R:5 };
 export const CENTER = 4;
 
 const FI = { U:0, D:1, F:2, B:3, L:4, R:5 };
-const Sf = (f, i) => f * 9 + i;
 const I  = (face, pos) => FI[face] * 9 + pos;
 
-// Rotación de la cara propia (copiado de solver-v2.js)
-const FACE_CW  = [6,3,0,7,4,1,8,5,2];
-const FACE_CCW = [2,5,8,1,4,7,0,3,6];
+// ── Ciclos de cada movimiento ─────────────────────────────────────
+// Cara propia: esquinas [0,2,8,6] y aristas [1,5,7,3] (horario)
+// Anillo: 3 ciclos de 4 stickers cada uno (horario)
+//
+// Verificado contra solver-v2.js (CYCLES) que funciona correctamente.
 
-// Ciclos del anillo adyacente (copiados exactamente de solver-v2.js CYCLES)
-// CW: next[b]=state[a], next[c]=state[b], next[d]=state[c], next[a]=state[d]
-const CYCLES = {
-  U: [[Sf(2,0),Sf(5,0),Sf(3,0),Sf(4,0)],[Sf(2,1),Sf(5,1),Sf(3,1),Sf(4,1)],[Sf(2,2),Sf(5,2),Sf(3,2),Sf(4,2)]],
-  D: [[Sf(2,6),Sf(4,6),Sf(3,6),Sf(5,6)],[Sf(2,7),Sf(4,7),Sf(3,7),Sf(5,7)],[Sf(2,8),Sf(4,8),Sf(3,8),Sf(5,8)]],
-  F: [[Sf(0,6),Sf(5,0),Sf(1,2),Sf(4,8)],[Sf(0,7),Sf(5,3),Sf(1,1),Sf(4,5)],[Sf(0,8),Sf(5,6),Sf(1,0),Sf(4,2)]],
-  B: [[Sf(0,2),Sf(4,0),Sf(1,6),Sf(5,8)],[Sf(0,1),Sf(4,3),Sf(1,7),Sf(5,5)],[Sf(0,0),Sf(4,6),Sf(1,8),Sf(5,2)]],
-  L: [[Sf(0,0),Sf(2,0),Sf(1,0),Sf(3,8)],[Sf(0,3),Sf(2,3),Sf(1,3),Sf(3,5)],[Sf(0,6),Sf(2,6),Sf(1,6),Sf(3,2)]],
-  R: [[Sf(0,2),Sf(2,2),Sf(1,2),Sf(3,6)],[Sf(0,5),Sf(2,5),Sf(1,5),Sf(3,3)],[Sf(0,8),Sf(2,8),Sf(1,8),Sf(3,0)]],
+const MOVES_DEF = {
+  U: {
+    face: 0,
+    ring: [
+      [I('F',0), I('L',0), I('B',0), I('R',0)],
+      [I('F',1), I('L',1), I('B',1), I('R',1)],
+      [I('F',2), I('L',2), I('B',2), I('R',2)],
+    ],
+  },
+  D: {
+    face: 1,
+    ring: [
+      [I('F',6), I('R',6), I('B',6), I('L',6)],
+      [I('F',7), I('R',7), I('B',7), I('L',7)],
+      [I('F',8), I('R',8), I('B',8), I('L',8)],
+    ],
+  },
+  F: {
+    face: 2,
+    ring: [
+      [I('U',6), I('R',0), I('D',2), I('L',8)],
+      [I('U',7), I('R',3), I('D',1), I('L',5)],
+      [I('U',8), I('R',6), I('D',0), I('L',2)],
+    ],
+  },
+  B: {
+    face: 3,
+    ring: [
+      [I('U',2), I('L',0), I('D',6), I('R',8)],
+      [I('U',1), I('L',3), I('D',7), I('R',5)],
+      [I('U',0), I('L',6), I('D',8), I('R',2)],
+    ],
+  },
+  L: {
+    face: 4,
+    ring: [
+      [I('U',0), I('F',0), I('D',0), I('B',8)],
+      [I('U',3), I('F',3), I('D',3), I('B',5)],
+      [I('U',6), I('F',6), I('D',6), I('B',2)],
+    ],
+  },
+  R: {
+    face: 5,
+    ring: [
+      [I('U',2), I('B',6), I('D',2), I('F',2)],
+      [I('U',5), I('B',3), I('D',5), I('F',5)],
+      [I('U',8), I('B',0), I('D',8), I('F',8)],
+    ],
+  },
 };
 
-// applyMove copiado de solver-v2.js (adaptado a in-place)
-function applyMove(s, faceName, cw) {
-  const fi   = FI[faceName];
-  const base = fi * 9;
-  const rot  = cw ? FACE_CW : FACE_CCW;
+// Aplica un ciclo de 4 en sentido horario sobre el array s (in-place)
+// Horario a→b→c→d→a: b←a, c←b, d←c, a←d
+function cycleCW(s, a, b, c, d) {
+  const tmp = s[d];
+  s[d] = s[c];
+  s[c] = s[b];
+  s[b] = s[a];
+  s[a] = tmp;
+}
 
-  // Rotar cara propia
-  const face = s.slice(base, base + 9);
-  for (let i = 0; i < 9; i++) s[base + i] = face[rot[i]];
+// Aplica un ciclo de 4 en sentido antihorario
+function cycleCCW(s, a, b, c, d) {
+  const tmp = s[a];
+  s[a] = s[b];
+  s[b] = s[c];
+  s[c] = s[d];
+  s[d] = tmp;
+}
+
+function applyMove(s, faceName, cw) {
+  const def  = MOVES_DEF[faceName];
+  const base = def.face * 9;
+  const fn   = cw ? cycleCW : cycleCCW;
+
+  // Rotar cara propia: esquinas y aristas
+  fn(s, base+0, base+2, base+8, base+6);
+  fn(s, base+1, base+5, base+7, base+3);
 
   // Rotar anillo adyacente
-  for (const [a,b,c,d] of CYCLES[faceName]) {
-    if (cw) {
-      const tmp = s[a]; s[a] = s[d]; s[d] = s[c]; s[c] = s[b]; s[b] = tmp;
-    } else {
-      const tmp = s[a]; s[a] = s[b]; s[b] = s[c]; s[c] = s[d]; s[d] = tmp;
-    }
-  }
+  for (const [a,b,c,d] of def.ring) fn(s, a, b, c, d);
 }
 
 // ── Clase Cube ────────────────────────────────────────────────────
@@ -106,10 +160,10 @@ export class Cube {
   }
 
   move(notation) {
-    const n    = notation.trim();
+    const n = notation.trim();
     const face = n[0];
     const mod  = n.slice(1);
-    if (!CYCLES[face]) throw new Error(`Movimiento desconocido: ${notation}`);
+    if (!MOVES_DEF[face]) throw new Error(`Movimiento desconocido: ${notation}`);
     const times = mod === '2' ? 2 : 1;
     const cw    = mod !== "'";
     for (let i = 0; i < times; i++) applyMove(this._s, face, cw);
