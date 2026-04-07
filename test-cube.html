@@ -13,7 +13,7 @@ h3{margin-top:16px}
 <p>Abre la consola del navegador para ver detalles adicionales.</p>
 <div id="out"></div>
 <script type="module">
-import { Cube } from './js/cube.js?v=3';
+import { Cube } from './js/cube.js?v=4';
 
 const out = document.getElementById('out');
 let pass=0, fail=0;
@@ -80,6 +80,10 @@ log("Sune×6", c.isSolved());}
   // R horario: col der U→F, F→D, D→B(inv), B(inv)→U
   log('R: col der U(0)→F', [c.state[2][2],c.state[2][5],c.state[2][8]].every(v=>v===0),
     'F[2,5,8]='+[c.state[2][2],c.state[2][5],c.state[2][8]]);
+  log('R: col der F(2)→D', [c.state[1][2],c.state[1][5],c.state[1][8]].every(v=>v===2),
+    'D[2,5,8]='+[c.state[1][2],c.state[1][5],c.state[1][8]]);
+  log('R: col der D(1)→B inv', [c.state[3][6],c.state[3][3],c.state[3][0]].every(v=>v===1),
+    'B[6,3,0]='+[c.state[3][6],c.state[3][3],c.state[3][0]]);
   log('R: cara L sin cambios', c.state[4].every(v=>v===4));
 }
 

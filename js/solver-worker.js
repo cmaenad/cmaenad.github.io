@@ -13,7 +13,7 @@ const CYCLES = {
   F: [[S(0,6),S(5,0),S(1,2),S(4,8)],[S(0,7),S(5,3),S(1,1),S(4,5)],[S(0,8),S(5,6),S(1,0),S(4,2)]],
   B: [[S(0,2),S(4,0),S(1,6),S(5,8)],[S(0,1),S(4,3),S(1,7),S(5,5)],[S(0,0),S(4,6),S(1,8),S(5,2)]],
   L: [[S(0,0),S(2,0),S(1,0),S(3,8)],[S(0,3),S(2,3),S(1,3),S(3,5)],[S(0,6),S(2,6),S(1,6),S(3,2)]],
-  R: [[S(0,2),S(3,6),S(1,2),S(2,2)],[S(0,5),S(3,3),S(1,5),S(2,5)],[S(0,8),S(3,0),S(1,8),S(2,8)]],
+  R: [[S(0,2),S(2,2),S(1,2),S(3,6)],[S(0,5),S(2,5),S(1,5),S(3,3)],[S(0,8),S(2,8),S(1,8),S(3,0)]],
 };
 const FACE_IDX = {U:0,D:1,F:2,B:3,L:4,R:5};
 
@@ -26,7 +26,7 @@ class CubeW {
     for(let i=0;i<9;i++) next[base+i]=flat[base+rot[i]];
     for(const[a,b,c,d]of cycles){
       if(cw){next[b]=flat[a];next[c]=flat[b];next[d]=flat[c];next[a]=flat[d];}
-      else  {next[d]=flat[a];next[c]=flat[b];next[b]=flat[c];next[a]=flat[d];}
+      else  {next[d]=flat[a];next[c]=flat[d];next[b]=flat[c];next[a]=flat[b];}
     }
     for(let f=0;f<6;f++) for(let i=0;i<9;i++) this.s[f][i]=next[f*9+i];
   }

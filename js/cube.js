@@ -68,11 +68,11 @@ const MOVE_CYCLES = {
     [S(0,6),S(2,6),S(1,6),S(3,2)],
   ],
   // R horario (visto desde la derecha):
-  // col der U → col izq B (inv) → col der D → col der F
+  // col der U → col der F → col der D → col izq B (inv) → col der U
   R: [
-    [S(0,2),S(3,6),S(1,2),S(2,2)],
-    [S(0,5),S(3,3),S(1,5),S(2,5)],
-    [S(0,8),S(3,0),S(1,8),S(2,8)],
+    [S(0,2),S(2,2),S(1,2),S(3,6)],
+    [S(0,5),S(2,5),S(1,5),S(3,3)],
+    [S(0,8),S(2,8),S(1,8),S(3,0)],
   ],
 };
 
@@ -116,18 +116,19 @@ export class Cube {
     for (let i = 0; i < 9; i++) next[base + i] = flat[base + rot[i]];
 
     // Aplicar ciclos adyacentes
+    // Ciclo [a,b,c,d] horario: a→b→c→d→a  (el valor de a va a b, b va a c, etc.)
+    // Ciclo [a,b,c,d] antihorario: a→d→c→b→a
     for (const [a,b,c,d] of cycles) {
       if (cw) {
-        // a→b→c→d→a  (el valor de a va a b, etc.)
         next[b] = flat[a];
         next[c] = flat[b];
         next[d] = flat[c];
         next[a] = flat[d];
       } else {
         next[d] = flat[a];
-        next[c] = flat[b];
-        next[b] = flat[c];
-        next[a] = flat[d];
+        next[c] = flat[d];  // ← corregido: c recibe de d (original)
+        next[b] = flat[c];  // ← corregido: b recibe de c (original)
+        next[a] = flat[b];  // ← corregido: a recibe de b (original)
       }
     }
 
