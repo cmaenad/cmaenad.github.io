@@ -11,7 +11,7 @@ pre{background:#1a1a1a;padding:4px 8px;border-radius:4px;margin:2px 0;font-size:
 <h2>Test exhaustivo de movimientos</h2>
 <div id="out"></div>
 <script type="module">
-import { Cube } from './js/cube.js?v=7';
+import { Cube, invertMoves } from './js/cube.js?v=9';
 const out = document.getElementById('out');
 let pass=0, fail=0;
 
@@ -283,7 +283,41 @@ sec('Orden de movimientos individuales (verificación de ciclos)');
   const alg=["R","U2","R'","U'","R","U2","L'","U","R'","U'","L"];
   const c=new Cube();
   for(let i=0;i<3;i++) c.applyMoves(alg);
-  log('Niklas×3 = identidad', c.isSolved());
+  log('Niklas×3 = identidad', c.isSolved(), c.isSolved()?'':'estado='+c.state.map((f,i)=>'UDFBLR'[i]+':'+f.join('')).join(' '));
+}
+
+sec("Tests de movimientos inversos L' R' F' B'");
+{
+  const c=new Cube(); c.move("L'");
+  log("L': col der B(3)→col izq D", allSame(col(c,1,0),3), 'D left='+col(c,1,0));
+  log("L': col izq D(1)→col izq F", allSame(col(c,2,0),1), 'F left='+col(c,2,0));
+  log("L': col izq F(2)→col izq U", allSame(col(c,0,0),2), 'U left='+col(c,0,0));
+  log("L': col izq U(0)→col der B", allSame(col(c,3,2),0), 'B right='+col(c,3,2));
+  showState(c);
+}
+{
+  const c=new Cube(); c.move("R'");
+  log("R': col izq B(3)→col der D", allSame(col(c,1,2),3), 'D right='+col(c,1,2));
+  log("R': col der D(1)→col der F", allSame(col(c,2,2),1), 'F right='+col(c,2,2));
+  log("R': col der F(2)→col der U", allSame(col(c,0,2),2), 'U right='+col(c,0,2));
+  log("R': col der U(0)→col izq B", allSame(col(c,3,0),0), 'B left='+col(c,3,0));
+  showState(c);
+}
+{
+  const c=new Cube(); c.move("F'");
+  log("F': col der L(4)→fila inf U", allSame(row(c,0,2),4), 'U bot='+row(c,0,2));
+  log("F': fila inf U(0)→col izq R", allSame(col(c,5,0),0), 'R left='+col(c,5,0));
+  log("F': col izq R(5)→fila sup D", allSame(row(c,1,0),5), 'D top='+row(c,1,0));
+  log("F': fila sup D(1)→col der L", allSame(col(c,4,2),1), 'L right='+col(c,4,2));
+  showState(c);
+}
+{
+  const c=new Cube(); c.move("B'");
+  log("B': col der R(5)→fila sup U", allSame(row(c,0,0),5), 'U top='+row(c,0,0));
+  log("B': fila sup U(0)→col izq L", allSame(col(c,4,0),0), 'L left='+col(c,4,0));
+  log("B': col izq L(4)→fila inf D", allSame(row(c,1,2),4), 'D bot='+row(c,1,2));
+  log("B': fila inf D(1)→col der R", allSame(col(c,5,2),1), 'R right='+col(c,5,2));
+  showState(c);
 }
 {
   // F R U R' U' F' tiene orden 6 (OLL)
