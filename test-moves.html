@@ -11,7 +11,7 @@ pre{background:#1a1a1a;padding:4px 8px;border-radius:4px;margin:2px 0;font-size:
 <h2>Test exhaustivo de movimientos</h2>
 <div id="out"></div>
 <script type="module">
-import { Cube, invertMoves } from './js/cube.js?v=10';
+import { Cube, invertMoves } from './js/cube.js?v=12';
 const out = document.getElementById('out');
 let pass=0, fail=0;
 
@@ -359,7 +359,44 @@ sec("Tests de movimientos inversos L' R' F' B'");
 }
 
 // ── SECCIÓN 6: Invertir mezcla ────────────────────────────────────
-sec('Verificación de paridad: T-perm y Niklas');
+sec('Orientación de esquinas: R F R\' F\' debe preservar esquinas');
+{
+  // Después de R F R' F', las esquinas URF y DFR deben estar en posición correcta
+  // Este es el "sexy move" con F en lugar de U
+  const c=new Cube();
+  c.applyMoves(['R','F',"R'","F'"]);
+  const flat=c.state.flat();
+  const counts=Array(6).fill(0); flat.forEach(v=>counts[v]++);
+  log('R F R\' F\': conservación', counts.every(n=>n===9), counts.join(','));
+  // Verificar esquina URF: U[8], F[2], R[0]
+  log('R F R\' F\': esquina URF intacta',
+    c.state[0][8]===0 && c.state[2][2]===2 && c.state[5][0]===5,
+    `U[8]=${c.state[0][8]} F[2]=${c.state[2][2]} R[0]=${c.state[5][0]}`);
+}
+{
+  // Verificar que F R F' R' tiene orden 6
+  const c=new Cube();
+  for(let i=0;i<6;i++) c.applyMoves(['F','R',"F'","R'"]);
+  log('(F R F\' R\')×6 = identidad', c.isSolved());
+}
+{
+  // Verificar esquinas tras F solo
+  const c=new Cube(); c.move('F');
+  // Esquina URF: ahora está en posición DFR
+  // La pieza URF (colores U=0,F=2,R=5) debería estar en DFR con orientación +1
+  // DFR: D[2], F[8], R[6]
+  // Con orientación +1: el facelet que era U ahora apunta a F, el que era F apunta a R, el que era R apunta a D
+  // Entonces: F[8]=0(U), R[6]=2(F), D[2]=5(R)
+  log('F: esquina URF→DFR: F[8]=0', c.state[2][8]===0, `F[8]=${c.state[2][8]}`);
+  log('F: esquina URF→DFR: R[6]=2', c.state[5][6]===2, `R[6]=${c.state[5][6]}`);
+  log('F: esquina URF→DFR: D[2]=5', c.state[1][2]===5, `D[2]=${c.state[1][2]}`);
+  // Esquina UFL (colores U=0,F=2,L=4) debería estar en URF con orientación +2
+  // Con orientación +2: el facelet que era U apunta a R, el que era F apunta a U, el que era L apunta a F
+  // Entonces: R[0]=0(U), U[8]=2(F), F[2]=4(L)
+  log('F: esquina UFL→URF: R[0]=0', c.state[5][0]===0, `R[0]=${c.state[5][0]}`);
+  log('F: esquina UFL→URF: U[8]=2', c.state[0][8]===2, `U[8]=${c.state[0][8]}`);
+  log('F: esquina UFL→URF: F[2]=4', c.state[2][2]===4, `F[2]=${c.state[2][2]}`);
+}
 {
   const tperm=['R','U',"R'","U'","R'","F","R2","U'","R'","U'","R","U","R'","F'"];
   const c=new Cube(); c.applyMoves(tperm);

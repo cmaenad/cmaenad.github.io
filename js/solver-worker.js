@@ -50,10 +50,12 @@ function isSolved(state) {
 }
 
 function fromStr(str) {
-  const parts = str.split('|');
-  const state = [];
-  for(const p of parts) for(const ch of p) state.push(Number(ch));
-  return state;
+  if (str.includes('|')) {
+    const state = [];
+    for(const p of str.split('|')) for(const ch of p) state.push(Number(ch));
+    return state;
+  }
+  return str.split('').map(Number);
 }
 
 // ── Heurística ────────────────────────────────────────────────────
