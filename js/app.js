@@ -2,7 +2,7 @@
  * app.js — Bootstrap y coordinación del juego
  */
 
-import { Cube } from './cube.js';
+import { Cube, invertMoves } from './cube.js';
 import { initRenderer, renderCube, applyViewRotation, setViewAngles, getViewAngles } from './renderer.js';
 import { initControls } from './controls.js';
 import { resolveColors, randomCountry, CLASSIC_COLORS } from './location.js';
@@ -15,6 +15,7 @@ const cube = new Cube();
 const colorsRef = { value: [] };
 let country = 'DEFAULT';
 let solveAnimating = false;
+let scrambleSolution = null; // solución garantizada tras randomize
 
 const cubeEl      = document.getElementById('cube');
 const containerEl = document.getElementById('cube-container');
@@ -24,9 +25,9 @@ const countryInfo = document.getElementById('country-info');
 const btnSolve    = document.getElementById('btn-solve');
 
 // ── Renderer ────────────────────────────────────────────────────────
-// onFaceMove: callback que recibe (faceName, cw) desde el botón central de cada cara
 initRenderer(cubeEl, (faceName, cw) => {
   cube.move(cw ? faceName : `${faceName}'`);
+  scrambleSolution = null; // movimiento manual invalida la solución guardada
   renderCube(cube, colorsRef.value);
   saveState();
 });
@@ -68,7 +69,10 @@ async function init() {
   initControls({
     cube,
     colorsRef,
-    onMove:       () => saveState(),
+    onMove: () => {
+      scrambleSolution = null; // movimiento manual invalida solución guardada
+      saveState();
+    },
     onRandomize:  handleRandomize,
     onSolve:      handleSolve,
     onReset:      handleReset,
@@ -129,7 +133,8 @@ function showCountryInfo(c, cols) {
 
 function handleRandomize() {
   if (solveAnimating) return;
-  cube.randomize(25);
+  const seq = cube.randomize(25);
+  scrambleSolution = invertMoves(seq); // solución garantizada
   renderCube(cube, colorsRef.value);
   saveState();
 }
@@ -187,9 +192,18 @@ async function handleSolve() {
 
   solveAnimating = true;
   btnSolve.disabled = true;
-  btnSolve.textContent = '⏳ Calculando...';
 
-  const moves = await calcSolutionInWorker(cube.serialize());
+  let moves;
+
+  if (scrambleSolution) {
+    // Solución garantizada disponible (tras randomize sin movimientos manuales)
+    moves = scrambleSolution;
+    scrambleSolution = null;
+  } else {
+    // Calcular con worker
+    btnSolve.textContent = '⏳ Calculando...';
+    moves = await calcSolutionInWorker(cube.serialize());
+  }
 
   if (!moves || moves.length === 0) {
     btnSolve.textContent = '✨ Resolver';

@@ -18,7 +18,7 @@ function testWorker(label, scramble) {
     c.applyMoves(scramble);
     const state = c.serialize();
     const t0 = performance.now();
-    const w = new Worker('./js/solver-worker.js');
+    const w = new Worker('./js/solver-v2.js');
     w.onmessage = e => {
       w.terminate();
       const dt = Math.round(performance.now()-t0);

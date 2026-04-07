@@ -174,6 +174,20 @@ export class Cube {
       prev=last; last=f;
     }
     this.applyMoves(seq);
+    // Guardar la secuencia inversa como solución garantizada
+    this._scrambleSolution = invertMoves(seq);
     return seq;
   }
+}
+
+// Invierte una secuencia de movimientos
+// Ej: ["R","U'","F2"] → ["F2","U","R'"]
+export function invertMoves(moves) {
+  return [...moves].reverse().map(m => {
+    const face = m[0];
+    const mod  = m.slice(1);
+    if (mod === '2') return face + '2';
+    if (mod === "'") return face;
+    return face + "'";
+  });
 }
