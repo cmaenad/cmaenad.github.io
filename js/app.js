@@ -7,70 +7,66 @@ import { initRenderer, renderCube, applyViewRotation, setViewAngles, getViewAngl
 import { initControls } from './controls.js';
 import { resolveColors } from './location.js';
 import { saveSession, loadSession } from './session.js';
-import { solve } from './solver.js';
 
 const cube = new Cube();
-let colors = [];
+
+// colorsRef es un objeto mutable compartido con controls.js
+// así las flechas siempre leen el array de colores actualizado
+const colorsRef = { value: [] };
 let country = 'DEFAULT';
 let solveAnimating = false;
 
-const cubeEl = document.getElementById('cube');
+const cubeEl      = document.getElementById('cube');
 const containerEl = document.getElementById('cube-container');
-const overlay = document.getElementById('overlay');
-const overlayMsg = document.getElementById('overlay-msg');
+const overlay     = document.getElementById('overlay');
+const overlayMsg  = document.getElementById('overlay-msg');
 const countryInfo = document.getElementById('country-info');
+const btnSolve    = document.getElementById('btn-solve');
 
-// ===== Guardar sesión =====
-function saveState() {
-  const { rotX, rotY } = getViewAngles();
-  saveSession(cube, colors, country, { rotX, rotY });
-}
-
-// ===== Inicializar renderer =====
+// ── Renderer ────────────────────────────────────────────────────────
 initRenderer(cubeEl);
 
-// ===== Arranque =====
+// ── Persistencia ────────────────────────────────────────────────────
+function saveState() {
+  const { rotX, rotY } = getViewAngles();
+  saveSession(cube, colorsRef.value, country, { rotX, rotY });
+}
+
+// ── Arranque ────────────────────────────────────────────────────────
 async function init() {
   const session = loadSession();
 
   if (session && session.colors && session.state) {
-    // Restaurar sesión guardada
-    colors = session.colors;
+    colorsRef.value = session.colors;
     country = session.country || 'DEFAULT';
     cube.deserialize(session.state);
-    if (session.viewAngles) {
-      setViewAngles(session.viewAngles.rotX, session.viewAngles.rotY);
-    }
+    if (session.viewAngles) setViewAngles(session.viewAngles.rotX, session.viewAngles.rotY);
     applyViewRotation(containerEl);
-    renderCube(cube, colors);
-    showCountryInfo(country, colors);
+    renderCube(cube, colorsRef.value);
+    showCountryInfo(country, colorsRef.value);
     hideOverlay();
   } else {
-    // Primera vez: pedir geolocalización
     overlayMsg.textContent = 'Necesitamos tu ubicación para personalizar los colores del cubo.';
-    document.getElementById('btn-allow').style.display = 'inline-block';
+    document.getElementById('btn-allow').style.display   = 'inline-block';
     document.getElementById('btn-default').style.display = 'inline-block';
 
     document.getElementById('btn-allow').addEventListener('click', async () => {
       overlayMsg.textContent = 'Obteniendo ubicación...';
-      document.getElementById('btn-allow').style.display = 'none';
+      document.getElementById('btn-allow').style.display   = 'none';
       document.getElementById('btn-default').style.display = 'none';
-      await loadColors();
+      await loadColors(false);
     });
-
-    document.getElementById('btn-default').addEventListener('click', async () => {
-      await loadColors(true);
-    });
+    document.getElementById('btn-default').addEventListener('click', () => loadColors(true));
   }
 
-  // Inicializar controles (siempre, para que funcionen los botones)
+  // Controles siempre se inicializan, usan colorsRef por referencia
   initControls({
     cube,
-    colors,
-    onMove: () => saveState(),
-    onRandomize: handleRandomize,
-    onSolve: handleSolve,
-    onReset: handleReset,
+    colorsRef,
+    onMove:       () => saveState(),
+    onRandomize:  handleRandomize,
+    onSolve:      handleSolve,
+    onReset:      handleReset,
     containerEl,
   });
 }
@@ -78,71 +74,110 @@ async function init() {
 async function loadColors(useDefault = false) {
   if (useDefault) {
     const { ensureSixColors, FLAG_COLORS } = await import('./location.js');
-    colors = ensureSixColors(FLAG_COLORS.DEFAULT);
+    colorsRef.value = ensureSixColors(FLAG_COLORS.DEFAULT);
     country = 'DEFAULT';
   } else {
     const result = await resolveColors();
-    colors = result.colors;
+    colorsRef.value = result.colors;
     country = result.country;
   }
-  renderCube(cube, colors);
+  renderCube(cube, colorsRef.value);
   applyViewRotation(containerEl);
-  showCountryInfo(country, colors);
+  showCountryInfo(country, colorsRef.value);
   saveState();
   hideOverlay();
 }
 
-function hideOverlay() {
-  overlay.style.display = 'none';
-}
+function hideOverlay() { overlay.style.display = 'none'; }
 
 function showCountryInfo(c, cols) {
   const swatches = cols.map(col =>
-    `<span style="display:inline-block;width:14px;height:14px;background:${col};border-radius:3px;margin:0 2px;vertical-align:middle;border:1px solid rgba(255,255,255,0.2)"></span>`
+    `<span style="display:inline-block;width:14px;height:14px;background:${col};
+     border-radius:3px;margin:0 2px;vertical-align:middle;
+     border:1px solid rgba(255,255,255,0.2)"></span>`
   ).join('');
   countryInfo.innerHTML = `País: <strong>${c}</strong> ${swatches}`;
 }
 
-// ===== Handlers =====
+// ── Handlers ────────────────────────────────────────────────────────
 
 function handleRandomize() {
   if (solveAnimating) return;
   cube.randomize(25);
-  renderCube(cube, colors);
+  renderCube(cube, colorsRef.value);
   saveState();
-}
-
-async function handleSolve() {
-  if (solveAnimating) return;
-  if (cube.isSolved()) return;
-
-  solveAnimating = true;
-  document.getElementById('btn-solve').disabled = true;
-
-  const moves = solve(cube);
-
-  // Animar cada movimiento con delay
-  for (const m of moves) {
-    cube.move(m);
-    renderCube(cube, colors);
-    saveState();
-    await delay(180);
-  }
-
-  solveAnimating = false;
-  document.getElementById('btn-solve').disabled = false;
 }
 
 function handleReset() {
   if (solveAnimating) return;
   cube.reset();
-  renderCube(cube, colors);
+  renderCube(cube, colorsRef.value);
   saveState();
+}
+
+/**
+ * Resolver: delega el cálculo al Web Worker para no bloquear la UI,
+ * luego anima cada movimiento en tiempo real con un delay visible.
+ */
+async function handleSolve() {
+  if (solveAnimating || cube.isSolved()) return;
+
+  solveAnimating = true;
+  btnSolve.disabled = true;
+  btnSolve.textContent = '⏳ Calculando...';
+
+  const moves = await calcSolutionInWorker(cube.serialize());
+
+  if (!moves || moves.length === 0) {
+    btnSolve.textContent = '✨ Resolver';
+    btnSolve.disabled = false;
+    solveAnimating = false;
+    return;
+  }
+
+  btnSolve.textContent = '▶ Resolviendo...';
+
+  for (const m of moves) {
+    cube.move(m);
+    renderCube(cube, colorsRef.value);
+    saveState();
+    await delay(200);
+  }
+
+  btnSolve.textContent = '✨ Resolver';
+  btnSolve.disabled = false;
+  solveAnimating = false;
+}
+
+/**
+ * Lanza el solver en un Web Worker y devuelve una Promise con los movimientos.
+ * Si el navegador no soporta Workers, cae al solver síncrono como fallback.
+ */
+function calcSolutionInWorker(state) {
+  return new Promise(async (resolve) => {
+    if (typeof Worker === 'undefined') {
+      // Fallback síncrono (no debería ocurrir en Chrome moderno)
+      const { solve } = await import('./solver.js');
+      const c = new Cube();
+      c.deserialize(state);
+      resolve(solve(c));
+      return;
+    }
+
+    const worker = new Worker('./js/solver-worker.js');
+    worker.onmessage = (e) => {
+      worker.terminate();
+      if (e.data.error) { resolve([]); return; }
+      resolve(e.data.moves);
+    };
+    worker.onerror = () => { worker.terminate(); resolve([]); };
+    worker.postMessage({ state });
+  });
 }
 
 function delay(ms) {
   return new Promise(res => setTimeout(res, ms));
 }
 
-// ===== Arrancar =====
+// ── Arrancar ────────────────────────────────────────────────────────
 init();
