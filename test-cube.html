@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"><title>Test Motor Cubo</title>
+<style>
+body{font-family:monospace;background:#111;color:#eee;padding:20px;font-size:13px;}
+.ok{color:#4f4}.err{color:#f44;font-weight:bold}
+pre{background:#1a1a1a;padding:6px;border-radius:4px;margin:2px 0;font-size:11px;overflow-x:auto}
+h3{margin-top:16px}
+</style>
+</head>
+<body>
+<h2>Test Motor del Cubo</h2>
+<p>Abre la consola del navegador para ver detalles adicionales.</p>
+<div id="out"></div>
+<script type="module">
+import { Cube } from './js/cube.js';
+
+const out = document.getElementById('out');
+let pass=0, fail=0;
+
+function log(label, ok, extra='') {
+  const d=document.createElement('div');
+  d.className=ok?'ok':'err';
+  d.textContent=(ok?'✓ ':'✗ ')+label+(extra?' → '+extra:'');
+  out.appendChild(d);
+  ok?pass++:fail++;
+}
+function showState(label, cube) {
+  const p=document.createElement('pre');
+  const names='UDFBLR';
+  p.textContent=label+'\n'+cube.state.map((f,i)=>names[i]+': '+f.join(' ')).join('\n');
+  out.appendChild(p);
+}
+
+// ── Test 1: Estado inicial ────────────────────────────────────────
+const c0=new Cube();
+log('isSolved() inicial', c0.isSolved());
+'UDFBLR'.split('').forEach((n,i)=>log(`Cara ${n} = color ${i}`, c0.state[i].every(v=>v===i)));
+
+// ── Test 2: X×4 = identidad ───────────────────────────────────────
+document.createElement('h3').textContent='X×4 = identidad';
+for(const m of ['U','D','F','B','L','R']){
+  const c=new Cube();c.move(m);c.move(m);c.move(m);c.move(m);
+  log(`${m}×4`, c.isSolved(), c.isSolved()?'':'FALLO cp='+c.cp+' co='+c.co);
+}
+
+// ── Test 3: M M' = identidad ──────────────────────────────────────
+for(const m of ['U','D','F','B','L','R']){
+  const c=new Cube();c.move(m);c.move(m+"'");
+  log(`${m} ${m}'`, c.isSolved());
+}
+
+// ── Test 4: Algoritmos conocidos ──────────────────────────────────
+{const c=new Cube();for(let i=0;i<6;i++)c.applyMoves(["R","U","R'","U'"]);
+log("(R U R' U')×6", c.isSolved());}
+
+{const c=new Cube();for(let i=0;i<6;i++)c.applyMoves(["R","U","R'","U","R","U2","R'"]);
+log("Sune×6", c.isSolved());}
+
+// ── Test 5: U mueve fila superior F→R ────────────────────────────
+{
+  const c=new Cube(); c.move('U');
+  showState('Tras U:', c);
+  // U horario: F→R, R→B, B→L, L→F  (fila superior = índices 0,1,2)
+  log('U: fila sup F(2)→R', [c.state[5][0],c.state[5][1],c.state[5][2]].every(v=>v===2),
+    'R[0,1,2]='+[c.state[5][0],c.state[5][1],c.state[5][2]]);
+  log('U: fila sup R(5)→B', [c.state[3][0],c.state[3][1],c.state[3][2]].every(v=>v===5),
+    'B[0,1,2]='+[c.state[3][0],c.state[3][1],c.state[3][2]]);
+  log('U: fila sup B(3)→L', [c.state[4][0],c.state[4][1],c.state[4][2]].every(v=>v===3),
+    'L[0,1,2]='+[c.state[4][0],c.state[4][1],c.state[4][2]]);
+  log('U: fila sup L(4)→F', [c.state[2][0],c.state[2][1],c.state[2][2]].every(v=>v===4),
+    'F[0,1,2]='+[c.state[2][0],c.state[2][1],c.state[2][2]]);
+  log('U: cara D sin cambios', c.state[1].every(v=>v===1));
+}
+
+// ── Test 6: R mueve col derecha U→F ──────────────────────────────
+{
+  const c=new Cube(); c.move('R');
+  showState('Tras R:', c);
+  // R horario: col der U→F, F→D, D→B(inv), B(inv)→U
+  log('R: col der U(0)→F', [c.state[2][2],c.state[2][5],c.state[2][8]].every(v=>v===0),
+    'F[2,5,8]='+[c.state[2][2],c.state[2][5],c.state[2][8]]);
+  log('R: cara L sin cambios', c.state[4].every(v=>v===4));
+}
+
+// ── Test 7: F mueve fila inf U→col izq R ─────────────────────────
+{
+  const c=new Cube(); c.move('F');
+  showState('Tras F:', c);
+  // F horario: fila inf U → col izq R (de arriba a abajo)
+  log('F: fila inf U(0)→col izq R', [c.state[5][0],c.state[5][3],c.state[5][6]].every(v=>v===0),
+    'R[0,3,6]='+[c.state[5][0],c.state[5][3],c.state[5][6]]);
+  log('F: cara B sin cambios', c.state[3].every(v=>v===3));
+}
+
+// ── Resumen ───────────────────────────────────────────────────────
+const h=document.createElement('h3');
+h.textContent=`Resultado: ${pass} OK, ${fail} FALLOS`;
+h.style.color=fail===0?'#4f4':'#f44';
+out.appendChild(h);
+</script>
+</body>
+</html>

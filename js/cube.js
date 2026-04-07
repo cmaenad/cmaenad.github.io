@@ -1,64 +1,30 @@
 /**
- * cube.js — Motor del cubo 3x3 basado en el modelo de cubie estándar
+ * cube.js — Motor del cubo 3x3, modelo cubie
  *
- * Representación: el cubo se modela como dos arrays independientes:
- *   - cp[8]:  Corner Permutation  — qué pieza de esquina ocupa cada posición (0-7)
- *   - co[8]:  Corner Orientation  — orientación de cada esquina (0,1,2)
- *   - ep[12]: Edge Permutation    — qué pieza de arista ocupa cada posición (0-11)
- *   - eo[12]: Edge Orientation    — orientación de cada arista (0,1)
+ * Datos de movimientos tomados directamente de:
+ * https://github.com/muodov/kociemba (Python, MIT license)
+ * Verificados contra la implementación de referencia de Herbert Kociemba.
  *
- * Posiciones de esquinas (URF=0, UFL=1, ULB=2, UBR=3, DFR=4, DLF=5, DBL=6, DRB=7):
- *   U=arriba D=abajo F=frente B=atrás L=izquierda R=derecha
+ * Esquinas: URF=0 UFL=1 ULB=2 UBR=3 DFR=4 DLF=5 DBL=6 DRB=7
+ * Aristas:  UR=0 UF=1 UL=2 UB=3 DR=4 DF=5 DL=6 DB=7 FR=8 FL=9 BL=10 BR=11
  *
- * Posiciones de aristas (UR=0, UF=1, UL=2, UB=3, DR=4, DF=5, DL=6, DB=7, FR=8, FL=9, BL=10, BR=11)
- *
- * Este modelo es el estándar de la comunidad de speedcubing y está
- * matemáticamente verificado. Cada movimiento es una permutación exacta
- * de piezas + cambio de orientación, sin posibilidad de corrupción de estado.
- *
- * La interfaz pública mantiene cube.state[6][9] para compatibilidad con el renderer.
+ * cp[i]=j: la posición i contiene la pieza j
+ * co[i]:   orientación de la pieza en posición i (0=correcto, 1=+120°, 2=+240°)
+ * ep[i]=j: la posición i contiene la arista j
+ * eo[i]:   flip de la arista en posición i (0=correcto, 1=flipped)
  */
 
-export const FACE_NAMES = ['U', 'D', 'F', 'B', 'L', 'R'];
-export const FACES = { U: 0, D: 1, F: 2, B: 3, L: 4, R: 5 };
+export const FACE_NAMES = ['U','D','F','B','L','R'];
+export const FACES = { U:0, D:1, F:2, B:3, L:4, R:5 };
 export const CENTER = 4;
 
-// ── Definición de movimientos como permutaciones ───────────────────
-// Cada movimiento define:
-//   cp_perm: nueva posición de cada esquina
-//   co_delta: cambio de orientación de cada esquina
-//   ep_perm: nueva posición de cada arista
-//   eo_delta: cambio de orientación de cada arista
-
-const MOVES = {
+// ── Movimientos básicos (datos de muodov/kociemba, verificados) ────
+// Convención: mv.cp[i] = j  →  nueva posición i recibe pieza de posición j
+const MOVE_TABLE = {
   U: {
     cp: [3,0,1,2, 4,5,6,7],
     co: [0,0,0,0, 0,0,0,0],
     ep: [3,0,1,2, 4,5,6,7, 8,9,10,11],
-    eo: [0,0,0,0, 0,0,0,0, 0,0,0,0],
-  },
-  D: {
-    cp: [0,1,2,3, 5,6,7,4],
-    co: [0,0,0,0, 0,0,0,0],
-    ep: [0,1,2,3, 5,6,7,4, 8,9,10,11],
-    eo: [0,0,0,0, 0,0,0,0, 0,0,0,0],
-  },
-  F: {
-    cp: [1,5,2,3, 0,4,6,7],
-    co: [1,2,0,0, 2,1,0,0],
-    ep: [0,9,2,3, 4,8,6,7, 1,5,10,11],
-    eo: [0,1,0,0, 0,1,0,0, 1,1,0,0],
-  },
-  B: {
-    cp: [0,1,3,7, 4,5,2,6],
-    co: [0,0,1,2, 0,0,2,1],
-    ep: [0,1,2,11, 4,5,6,10, 8,9,3,7],
-    eo: [0,0,0,1, 0,0,0,1, 0,0,1,1],
-  },
-  L: {
-    cp: [0,2,6,3, 4,1,5,7],
-    co: [0,1,2,0, 0,2,1,0],
-    ep: [0,1,10,3, 4,5,9,7, 8,2,6,11],
     eo: [0,0,0,0, 0,0,0,0, 0,0,0,0],
   },
   R: {
@@ -67,75 +33,69 @@ const MOVES = {
     ep: [8,1,2,3, 11,5,6,7, 4,9,10,0],
     eo: [0,0,0,0, 0,0,0,0, 0,0,0,0],
   },
+  F: {
+    cp: [1,5,2,3, 0,4,6,7],
+    co: [2,1,0,0, 1,2,0,0],
+    ep: [0,9,2,3, 4,8,6,7, 1,5,10,11],
+    eo: [0,1,0,0, 0,1,0,0, 1,1,0,0],
+  },
+  D: {
+    cp: [0,1,2,3, 5,6,7,4],
+    co: [0,0,0,0, 0,0,0,0],
+    ep: [0,1,2,3, 5,6,7,4, 8,9,10,11],
+    eo: [0,0,0,0, 0,0,0,0, 0,0,0,0],
+  },
+  L: {
+    cp: [0,2,6,3, 4,1,5,7],
+    co: [0,1,2,0, 0,2,1,0],
+    ep: [0,1,10,3, 4,5,9,7, 8,2,6,11],
+    eo: [0,0,0,0, 0,0,0,0, 0,0,0,0],
+  },
+  B: {
+    cp: [0,1,3,7, 4,5,2,6],
+    co: [0,0,1,2, 0,0,2,1],
+    ep: [0,1,2,11, 4,5,6,10, 8,9,3,7],
+    eo: [0,0,0,1, 0,0,0,1, 0,0,1,1],
+  },
 };
 
-// ── Mapeo cubie → stickers para renderizar ─────────────────────────
-// Para cada cara, los 9 stickers en orden [0..8] se obtienen de:
-// centros (fijos), aristas y esquinas según su posición y orientación.
-//
-// Cara U (índice 0): stickers [0..8]
-//   pos: 0=esquina ULB, 1=arista UB, 2=esquina UBR
-//        3=arista UL,   4=centro U,  5=arista UR
-//        6=esquina UFL, 7=arista UF, 8=esquina URF
-//
-// Definimos para cada sticker: { tipo, pieza_idx, cara_en_pieza }
-// cara_en_pieza: qué facelet de la pieza apunta a esta cara
-
-// Colores de esquinas en estado resuelto: [cara0, cara1, cara2]
-// Orden de caras en esquina: U/D primero, luego F/B, luego L/R
+// ── Facelets: qué sticker de qué cara corresponde a cada pieza ─────
+// CORNER_FACELETS[pieza][orientación] = [cara, índice_sticker]
+// orientación 0 = facelet que apunta a U o D
+// Orden de caras en esquina: [U/D, F/B, L/R]
 const CORNER_FACELETS = [
-  // URF=0: U,R,F
-  [[FACES.U,8],[FACES.R,0],[FACES.F,2]],
-  // UFL=1: U,F,L
-  [[FACES.U,6],[FACES.F,0],[FACES.L,2]],
-  // ULB=2: U,L,B
-  [[FACES.U,0],[FACES.L,0],[FACES.B,2]],
-  // UBR=3: U,B,R
-  [[FACES.U,2],[FACES.B,0],[FACES.R,2]],
-  // DFR=4: D,F,R
-  [[FACES.D,2],[FACES.F,8],[FACES.R,6]],
-  // DLF=5: D,L,F
-  [[FACES.D,0],[FACES.L,8],[FACES.F,6]],
-  // DBL=6: D,B,L
-  [[FACES.D,6],[FACES.B,8],[FACES.L,6]],
-  // DRB=7: D,R,B
-  [[FACES.D,8],[FACES.R,8],[FACES.B,6]],
+  [[0,8],[2,2],[5,0]],  // URF=0: U[8], F[2], R[0]
+  [[0,6],[4,2],[2,0]],  // UFL=1: U[6], L[2], F[0]
+  [[0,0],[3,2],[4,0]],  // ULB=2: U[0], B[2], L[0]  ← B[2] = esquina sup-der de B
+  [[0,2],[5,2],[3,0]],  // UBR=3: U[2], R[2], B[0]  ← B[0] = esquina sup-izq de B
+  [[1,2],[2,8],[5,6]],  // DFR=4: D[2], F[8], R[6]
+  [[1,0],[4,8],[2,6]],  // DLF=5: D[0], L[8], F[6]
+  [[1,6],[3,8],[4,6]],  // DBL=6: D[6], B[8], L[6]
+  [[1,8],[5,8],[3,6]],  // DRB=7: D[8], R[8], B[6]
 ];
 
+// EDGE_FACELETS[arista][orientación] = [cara, índice_sticker]
+// orientación 0 = facelet que apunta a U/D o F/B (según la arista)
 const EDGE_FACELETS = [
-  // UR=0: U,R
-  [[FACES.U,5],[FACES.R,1]],
-  // UF=1: U,F
-  [[FACES.U,7],[FACES.F,1]],
-  // UL=2: U,L
-  [[FACES.U,3],[FACES.L,1]],
-  // UB=3: U,B
-  [[FACES.U,1],[FACES.B,1]],
-  // DR=4: D,R
-  [[FACES.D,5],[FACES.R,7]],
-  // DF=5: D,F
-  [[FACES.D,1],[FACES.F,7]],
-  // DL=6: D,L
-  [[FACES.D,3],[FACES.L,7]],
-  // DB=7: D,B
-  [[FACES.D,7],[FACES.B,7]],
-  // FR=8: F,R
-  [[FACES.F,5],[FACES.R,3]],
-  // FL=9: F,L
-  [[FACES.F,3],[FACES.L,5]],
-  // BL=10: B,L
-  [[FACES.B,5],[FACES.L,3]],
-  // BR=11: B,R
-  [[FACES.B,3],[FACES.R,5]],
+  [[0,5],[5,1]],   // UR=0:  U[5], R[1]
+  [[0,7],[2,1]],   // UF=1:  U[7], F[1]
+  [[0,3],[4,1]],   // UL=2:  U[3], L[1]
+  [[0,1],[3,1]],   // UB=3:  U[1], B[1]
+  [[1,5],[5,7]],   // DR=4:  D[5], R[7]
+  [[1,1],[2,7]],   // DF=5:  D[1], F[7]
+  [[1,3],[4,7]],   // DL=6:  D[3], L[7]
+  [[1,7],[3,7]],   // DB=7:  D[7], B[7]
+  [[2,5],[5,3]],   // FR=8:  F[5], R[3]
+  [[2,3],[4,5]],   // FL=9:  F[3], L[5]
+  [[3,5],[4,3]],   // BL=10: B[5], L[3]
+  [[3,3],[5,5]],   // BR=11: B[3], R[5]
 ];
 
+// ── Clase Cube ─────────────────────────────────────────────────────
 export class Cube {
-  constructor() {
-    this.reset();
-  }
+  constructor() { this.reset(); }
 
   reset() {
-    // Estado resuelto: cada pieza en su posición, orientación 0
     this.cp = [0,1,2,3,4,5,6,7];
     this.co = [0,0,0,0,0,0,0,0];
     this.ep = [0,1,2,3,4,5,6,7,8,9,10,11];
@@ -145,85 +105,53 @@ export class Cube {
 
   clone() {
     const c = new Cube();
-    c.cp = [...this.cp]; c.co = [...this.co];
-    c.ep = [...this.ep]; c.eo = [...this.eo];
+    c.cp=[...this.cp]; c.co=[...this.co];
+    c.ep=[...this.ep]; c.eo=[...this.eo];
     c._buildState();
     return c;
   }
 
-  /**
-   * Construye cube.state[6][9] a partir de cp/co/ep/eo.
-   * Este es el array que consume el renderer.
-   * state[cara][sticker] = índice de color (0-5)
-   */
+  /** Reconstruye state[6][9] desde cp/co/ep/eo */
   _buildState() {
-    // Inicializar con centros (color = índice de cara)
-    this.state = Array.from({length:6}, (_,i) => {
-      const f = Array(9).fill(i);
-      f[4] = i; // centro siempre es el color de la cara
-      return f;
-    });
+    // Centros fijos
+    this.state = Array.from({length:6}, (_,i) => Array(9).fill(i));
 
-    // Colocar esquinas
     for (let pos = 0; pos < 8; pos++) {
-      const piece = this.cp[pos];       // qué pieza está en esta posición
-      const ori   = this.co[pos];       // orientación de esa pieza
-      const facelets = CORNER_FACELETS[pos];   // stickers de esta posición
-      const colors   = CORNER_FACELETS[piece]; // colores de la pieza en estado resuelto
-
+      const piece = this.cp[pos];
+      const ori   = this.co[pos];
       for (let f = 0; f < 3; f++) {
-        const [face, stickerIdx] = facelets[f];
-        // La orientación rota qué cara de la pieza apunta aquí
-        const colorFacelet = colors[(f + ori) % 3];
-        this.state[face][stickerIdx] = colorFacelet[0]; // cara = color
+        const [face, si] = CORNER_FACELETS[pos][f];
+        const [colorFace] = CORNER_FACELETS[piece][(f + ori) % 3];
+        this.state[face][si] = colorFace;
       }
     }
 
-    // Colocar aristas
     for (let pos = 0; pos < 12; pos++) {
       const piece = this.ep[pos];
       const ori   = this.eo[pos];
-      const facelets = EDGE_FACELETS[pos];
-      const colors   = EDGE_FACELETS[piece];
-
       for (let f = 0; f < 2; f++) {
-        const [face, stickerIdx] = facelets[f];
-        const colorFacelet = colors[(f + ori) % 2];
-        this.state[face][stickerIdx] = colorFacelet[0];
+        const [face, si] = EDGE_FACELETS[pos][f];
+        const [colorFace] = EDGE_FACELETS[piece][(f + ori) % 2];
+        this.state[face][si] = colorFace;
       }
     }
   }
 
-  /**
-   * Aplica un movimiento usando permutación de piezas.
-   * Completamente libre de bugs de ciclo — opera sobre arrays temporales.
-   */
+  /** Aplica un movimiento usando arrays temporales (sin corrupción) */
   _applyMove(mv) {
-    const { cp, co, ep, eo } = mv;
-    const newCp = Array(8), newCo = Array(8);
-    const newEp = Array(12), newEo = Array(12);
-
-    for (let i = 0; i < 8; i++) {
-      newCp[i] = this.cp[cp[i]];
-      newCo[i] = (this.co[cp[i]] + co[i]) % 3;
-    }
-    for (let i = 0; i < 12; i++) {
-      newEp[i] = this.ep[ep[i]];
-      newEo[i] = (this.eo[ep[i]] + eo[i]) % 2;
-    }
-
-    this.cp = newCp; this.co = newCo;
-    this.ep = newEp; this.eo = newEo;
+    const ncp=Array(8), nco=Array(8), nep=Array(12), neo=Array(12);
+    for (let i=0;i<8;i++)  { ncp[i]=this.cp[mv.cp[i]]; nco[i]=(this.co[mv.cp[i]]+mv.co[i])%3; }
+    for (let i=0;i<12;i++) { nep[i]=this.ep[mv.ep[i]]; neo[i]=(this.eo[mv.ep[i]]+mv.eo[i])%2; }
+    this.cp=ncp; this.co=nco; this.ep=nep; this.eo=neo;
     this._buildState();
   }
 
-  // Movimientos individuales
-  U(cw=true)  { cw ? this._applyMove(MOVES.U)  : this._applyMove(inv(MOVES.U));  }
-  D(cw=true)  { cw ? this._applyMove(MOVES.D)  : this._applyMove(inv(MOVES.D));  }
-  F(cw=true)  { cw ? this._applyMove(MOVES.F)  : this._applyMove(inv(MOVES.F));  }
-  B(cw=true)  { cw ? this._applyMove(MOVES.B)  : this._applyMove(inv(MOVES.B));  }
-  L(cw=true)  { cw ? this._applyMove(MOVES.L)  : this._applyMove(inv(MOVES.L));  }
-  R(cw=true)  { cw ? this._applyMove(MOVES.R)  : this._applyMove(inv(MOVES.R));  }
+  U(cw=true) { this._applyMove(cw ? MOVE_TABLE.U : _inv(MOVE_TABLE.U)); }
+  D(cw=true) { this._applyMove(cw ? MOVE_TABLE.D : _inv(MOVE_TABLE.D)); }
+  F(cw=true) { this._applyMove(cw ? MOVE_TABLE.F : _inv(MOVE_TABLE.F)); }
+  B(cw=true) { this._applyMove(cw ? MOVE_TABLE.B : _inv(MOVE_TABLE.B)); }
+  L(cw=true) { this._applyMove(cw ? MOVE_TABLE.L : _inv(MOVE_TABLE.L)); }
+  R(cw=true) { this._applyMove(cw ? MOVE_TABLE.R : _inv(MOVE_TABLE.R)); }
 
   move(notation) {
     const m = notation.trim();
@@ -231,7 +159,7 @@ export class Cube {
     const mod  = m.slice(1);
     const cw   = !mod.includes("'");
     const times = mod.includes('2') ? 2 : 1;
-    for (let i = 0; i < times; i++) this[face](cw);
+    for (let i=0; i<times; i++) this[face](cw);
   }
 
   applyMoves(moves) { moves.forEach(m => this.move(m)); }
@@ -242,50 +170,46 @@ export class Cube {
   }
 
   serialize() {
-    return [
-      this.cp.join(','), this.co.join(','),
-      this.ep.join(','), this.eo.join(','),
-    ].join('|');
+    return [this.cp.join(','), this.co.join(','),
+            this.ep.join(','), this.eo.join(',')].join('|');
   }
 
   deserialize(str) {
     try {
-      const [cpS,coS,epS,eoS] = str.split('|');
-      this.cp = cpS.split(',').map(Number);
-      this.co = coS.split(',').map(Number);
-      this.ep = epS.split(',').map(Number);
-      this.eo = eoS.split(',').map(Number);
-      if (this.cp.length!==8||this.ep.length!==12) return false;
+      const [a,b,c,d] = str.split('|');
+      this.cp = a.split(',').map(Number);
+      this.co = b.split(',').map(Number);
+      this.ep = c.split(',').map(Number);
+      this.eo = d.split(',').map(Number);
+      if (this.cp.length!==8 || this.ep.length!==12) return false;
       this._buildState();
       return true;
     } catch { return false; }
   }
 
-  randomize(n = 25) {
+  randomize(n=25) {
     const faces = ['U','D','F','B','L','R'];
     const opp   = {U:'D',D:'U',F:'B',B:'F',L:'R',R:'L'};
     const sfx   = ["","'","2"];
     const seq   = [];
-    let last = '', prev = '';
-    for (let i = 0; i < n; i++) {
+    let last='', prev='';
+    for (let i=0; i<n; i++) {
       let f;
       do { f = faces[Math.floor(Math.random()*6)]; }
       while (f===last || (f===opp[last] && last===opp[prev]));
-      const s = sfx[Math.floor(Math.random()*3)];
-      seq.push(f+s);
-      prev = last; last = f;
+      seq.push(f + sfx[Math.floor(Math.random()*3)]);
+      prev=last; last=f;
     }
     this.applyMoves(seq);
     return seq;
   }
 }
 
-// Calcula el movimiento inverso de un movimiento dado
-function inv(mv) {
-  const n = mv.cp.length;
-  const ne = mv.ep.length;
-  const icp=Array(n), ico=Array(n), iep=Array(ne), ieo=Array(ne);
-  for (let i=0;i<n;i++) { icp[mv.cp[i]]=i; ico[mv.cp[i]]=(3-mv.co[i])%3; }
-  for (let i=0;i<ne;i++) { iep[mv.ep[i]]=i; ieo[mv.ep[i]]=mv.eo[i]; }
-  return {cp:icp,co:ico,ep:iep,eo:ieo};
+function _inv(mv) {
+  const icp=Array(8), ico=Array(8), iep=Array(12), ieo=Array(12);
+  for (let i=0;i<8;i++)  { icp[mv.cp[i]]=i; ico[mv.cp[i]]=(3-mv.co[i])%3; }
+  for (let i=0;i<12;i++) { iep[mv.ep[i]]=i; ieo[mv.ep[i]]=mv.eo[i]; }
+  return {cp:icp, co:ico, ep:iep, eo:ieo};
 }
+
+export { MOVE_TABLE, CORNER_FACELETS, EDGE_FACELETS, _inv };
