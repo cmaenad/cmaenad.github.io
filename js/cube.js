@@ -84,15 +84,14 @@ function buildPerm(faceName, cw) {
   const perm = Array.from({length: 54}, (_, i) => i); // identidad
 
   // Rotar la cara propia
+  // Ciclo a→b→c→d→a horario: perm[destino]=origen → b←a, c←b, d←c, a←d
   for (const [a,b,c,d] of FACE_CYCLES) {
     if (cw) {
-      // horario: a←d, b←a, c←b, d←c
-      perm[base+a] = base+d;
       perm[base+b] = base+a;
       perm[base+c] = base+b;
       perm[base+d] = base+c;
+      perm[base+a] = base+d;
     } else {
-      // antihorario: a←b, b←c, c←d, d←a
       perm[base+a] = base+b;
       perm[base+b] = base+c;
       perm[base+c] = base+d;
@@ -101,15 +100,14 @@ function buildPerm(faceName, cw) {
   }
 
   // Ciclos del anillo adyacente
+  // Ciclo a→b→c→d→a horario: b←a, c←b, d←c, a←d
   for (const [a,b,c,d] of RING_CYCLES[faceName]) {
     if (cw) {
-      // horario a→b→c→d→a: b←a, c←b, d←c, a←d
       perm[b] = a;
       perm[c] = b;
       perm[d] = c;
       perm[a] = d;
     } else {
-      // antihorario: a←b, d←a, c←d, b←c
       perm[a] = b;
       perm[b] = c;
       perm[c] = d;
