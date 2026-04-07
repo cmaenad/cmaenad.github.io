@@ -1,0 +1,239 @@
+/* ===== Reset y base ===== */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #1a1a2e;
+  --panel: #16213e;
+  --btn-bg: #0f3460;
+  --btn-hover: #e94560;
+  --text: #eaeaea;
+  --arrow-size: 36px;
+  --cube-size: 240px;
+  --face-size: 240px;
+  --sticker-gap: 4px;
+}
+
+html, body {
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  overflow: hidden;
+  touch-action: none;
+}
+
+/* ===== Layout principal ===== */
+#app {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  height: 100dvh;
+  padding: 8px;
+  gap: 6px;
+}
+
+/* ===== Overlay ===== */
+#overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(10,10,20,0.95);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+#overlay-content {
+  text-align: center;
+  padding: 32px;
+  background: var(--panel);
+  border-radius: 16px;
+  max-width: 320px;
+  gap: 16px;
+  display: flex;
+  flex-direction: column;
+}
+#overlay-content h1 { font-size: 2rem; }
+#overlay-content p { font-size: 0.95rem; opacity: 0.85; }
+#overlay button {
+  padding: 10px 24px;
+  border: none;
+  border-radius: 8px;
+  background: var(--btn-hover);
+  color: #fff;
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+/* ===== Controles de vista ===== */
+.view-controls {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.rot-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.cube-label {
+  font-size: 0.65rem;
+  opacity: 0.5;
+  letter-spacing: 2px;
+}
+.rot-btn {
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: 8px;
+  background: var(--btn-bg);
+  color: var(--text);
+  font-size: 1.1rem;
+  cursor: pointer;
+  transition: background 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.rot-btn:hover, .rot-btn:active { background: var(--btn-hover); }
+
+/* ===== Escena 3D ===== */
+#scene-wrapper {
+  position: relative;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+}
+#scene {
+  perspective: 600px;
+  perspective-origin: 50% 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+#cube-container {
+  transform-style: preserve-3d;
+  transition: transform 0.4s ease;
+}
+#cube {
+  position: relative;
+  width: var(--cube-size);
+  height: var(--cube-size);
+  transform-style: preserve-3d;
+}
+
+/* ===== Caras del cubo ===== */
+.cube-face {
+  position: absolute;
+  width: var(--face-size);
+  height: var(--face-size);
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+  gap: var(--sticker-gap);
+  padding: var(--sticker-gap);
+  background: #111;
+  border-radius: 6px;
+  backface-visibility: visible;
+}
+
+/* Posición de cada cara */
+.face-F { transform: translateZ(calc(var(--cube-size) / 2)); }
+.face-B { transform: rotateY(180deg) translateZ(calc(var(--cube-size) / 2)); }
+.face-L { transform: rotateY(-90deg) translateZ(calc(var(--cube-size) / 2)); }
+.face-R { transform: rotateY(90deg) translateZ(calc(var(--cube-size) / 2)); }
+.face-U { transform: rotateX(90deg) translateZ(calc(var(--cube-size) / 2)); }
+.face-D { transform: rotateX(-90deg) translateZ(calc(var(--cube-size) / 2)); }
+
+/* ===== Stickers ===== */
+.sticker {
+  border-radius: 4px;
+  transition: background-color 0.2s;
+}
+
+/* ===== Flechas de movimiento ===== */
+#move-arrows {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.move-arrow {
+  position: absolute;
+  width: var(--arrow-size);
+  height: var(--arrow-size);
+  border: none;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.15);
+  color: #fff;
+  font-size: 1rem;
+  cursor: pointer;
+  pointer-events: all;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s;
+  -webkit-tap-highlight-color: transparent;
+  backdrop-filter: blur(4px);
+}
+.move-arrow:hover, .move-arrow:active {
+  background: rgba(233,69,96,0.7);
+}
+
+/* ===== Botones de acción ===== */
+#bottom-controls {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+#action-buttons {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+#action-buttons button {
+  padding: 10px 18px;
+  border: none;
+  border-radius: 10px;
+  background: var(--btn-bg);
+  color: var(--text);
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: background 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+#action-buttons button:hover, #action-buttons button:active {
+  background: var(--btn-hover);
+}
+
+/* ===== Info país ===== */
+#country-info {
+  font-size: 0.75rem;
+  opacity: 0.5;
+  text-align: center;
+}
+
+/* ===== Animación de movimiento ===== */
+.face-animating {
+  transition: transform 0.18s ease-in-out;
+}
+
+/* ===== Responsive PC ===== */
+@media (min-width: 600px) {
+  :root {
+    --cube-size: 300px;
+    --face-size: 300px;
+    --arrow-size: 42px;
+  }
+  #action-buttons button { font-size: 1rem; padding: 12px 22px; }
+}
+
+@media (min-width: 900px) {
+  :root {
+    --cube-size: 360px;
+    --face-size: 360px;
+  }
+}

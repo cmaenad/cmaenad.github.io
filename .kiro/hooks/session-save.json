@@ -1,0 +1,13 @@
+{
+  "name": "Guardar sesión al editar JS",
+  "version": "1.0.0",
+  "description": "Recuerda al agente que toda lógica de movimiento debe persistir el estado en localStorage automáticamente",
+  "when": {
+    "type": "fileEdited",
+    "patterns": ["js/*.js"]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Verifica que cualquier función que modifique el estado del cubo llame a session.save() al final, para mantener la persistencia en localStorage."
+  }
+}

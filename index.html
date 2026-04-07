@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>Cubo Mágico</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="app">
+    <!-- Overlay de carga/permiso -->
+    <div id="overlay">
+      <div id="overlay-content">
+        <h1>🎲 Cubo Mágico</h1>
+        <p id="overlay-msg">Detectando tu ubicación para personalizar los colores...</p>
+        <button id="btn-allow" style="display:none">Permitir ubicación</button>
+        <button id="btn-default" style="display:none">Usar colores por defecto</button>
+      </div>
+    </div>
+
+    <!-- Controles superiores: rotar vista -->
+    <div id="top-controls" class="view-controls">
+      <button class="rot-btn" data-rot="rotateUp" title="Rotar arriba">▲</button>
+      <div class="rot-row">
+        <button class="rot-btn" data-rot="rotateLeft" title="Rotar izquierda">◀</button>
+        <span class="cube-label">VISTA</span>
+        <button class="rot-btn" data-rot="rotateRight" title="Rotar derecha">▶</button>
+      </div>
+    </div>
+
+    <!-- Escena 3D del cubo -->
+    <div id="scene-wrapper">
+      <div id="scene">
+        <div id="cube-container">
+          <div id="cube">
+            <!-- Las 6 caras se generan por JS -->
+          </div>
+        </div>
+      </div>
+
+      <!-- Flechas de movimiento superpuestas -->
+      <div id="move-arrows">
+        <!-- Generadas por controls.js -->
+      </div>
+    </div>
+
+    <!-- Controles inferiores: rotar vista + acciones -->
+    <div id="bottom-controls">
+      <div class="view-controls">
+        <button class="rot-btn" data-rot="rotateDown" title="Rotar abajo">▼</button>
+      </div>
+      <div id="action-buttons">
+        <button id="btn-randomize">🔀 Revolver</button>
+        <button id="btn-solve">✨ Resolver</button>
+        <button id="btn-reset">↺ Reiniciar</button>
+      </div>
+    </div>
+
+    <!-- Info de país/colores -->
+    <div id="country-info"></div>
+  </div>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

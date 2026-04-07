@@ -1,0 +1,13 @@
+{
+  "name": "Sin dependencias externas",
+  "version": "1.0.0",
+  "description": "Previene el uso de librerías externas o npm en el proyecto",
+  "when": {
+    "type": "preToolUse",
+    "toolTypes": ["write"]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Antes de escribir este archivo, confirma que no estás introduciendo imports de librerías externas, CDN links de frameworks, ni archivos package.json con dependencias. El proyecto usa únicamente vanilla JavaScript, CSS3 y HTML5."
+  }
+}
