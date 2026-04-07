@@ -11,7 +11,7 @@ pre{background:#1a1a1a;padding:4px 8px;border-radius:4px;margin:2px 0;font-size:
 <h2>Test Motor Cubo — versión simplificada</h2>
 <div id="out"></div>
 <script type="module">
-import { Cube, invertMoves } from './js/cube.js?v=19';
+import { Cube, invertMoves } from './js/cube.js?v=20';
 const out = document.getElementById('out');
 let pass=0, fail=0;
 
@@ -160,13 +160,12 @@ sec('Algoritmos con orden conocido');
   const steps=['R','U',"R'","U'","R'","F","R2","U'","R'","U'","R","U","R'","F'"];
   const c2=new Cube();
   for(let s=0;s<steps.length;s++){
-    const before=c2.state.flat().join('');
+    const before=c2._s ? [...c2._s] : c2.state.flat();
     c2.move(steps[s]);
-    const after=c2.state.flat().join('');
+    const after=c2._s ? [...c2._s] : c2.state.flat();
     const ch=[];
     for(let i=0;i<54;i++) if(before[i]!==after[i]) ch.push(i);
-    // Verificar que el movimiento cambió exactamente 20 stickers (9 cara + 12 anillo - 1 centro)
-    // En realidad: 8 de la cara + 12 del anillo = 20
+    // Cada movimiento individual desde cualquier estado debe cambiar exactamente 20 stickers
     log(`Paso ${s+1} ${steps[s]}: ${ch.length} stickers cambiados`,ch.length===20,
       ch.length!==20?'cambió '+ch.length:'');
   }
