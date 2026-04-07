@@ -95,10 +95,10 @@ const PERM_L = buildPerm(L, [
   I(D,0),I(D,3),I(D,6),  I(B,8),I(B,5),I(B,2),
 ]);
 
-// R horario (desde la derecha): U-right → B-left(inv) → D-right → F-right
+// R horario (desde la derecha): U-right → F-right → D-right → B-left(inv)
 const PERM_R = buildPerm(R, [
-  I(U,2),I(U,5),I(U,8),  I(B,6),I(B,3),I(B,0),
-  I(D,2),I(D,5),I(D,8),  I(F,2),I(F,5),I(F,8),
+  I(U,2),I(U,5),I(U,8),  I(F,2),I(F,5),I(F,8),
+  I(D,2),I(D,5),I(D,8),  I(B,6),I(B,3),I(B,0),
 ]);
 
 // Tabla completa: X, X', X2
