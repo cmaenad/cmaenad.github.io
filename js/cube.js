@@ -54,17 +54,15 @@ function rotateFaceCW(perm, faceOffset) {
 
 function cycleAdjacentCW(perm, a, b, c, d) {
   // a, b, c, d son arrays de 3 índices absolutos cada uno
-  // Horario: B←A, C←B, D←C, A←D
-  // IMPORTANTE: leer todos los valores originales ANTES de escribir
+  // Ciclo horario: A→B→C→D→A
+  // En términos de permutación (destino ← origen):
+  //   perm[B] = A significa "el valor en B viene de A"
+  // Entonces: B←A, C←B, D←C, A←D
   for (let i = 0; i < 3; i++) {
-    const oa = perm[a[i]];
-    const ob = perm[b[i]];
-    const oc = perm[c[i]];
-    const od = perm[d[i]];
-    perm[b[i]] = oa;
-    perm[c[i]] = ob;
-    perm[d[i]] = oc;
-    perm[a[i]] = od;
+    perm[b[i]] = a[i];  // B recibe de A
+    perm[c[i]] = b[i];  // C recibe de B
+    perm[d[i]] = c[i];  // D recibe de C
+    perm[a[i]] = d[i];  // A recibe de D
   }
 }
 
