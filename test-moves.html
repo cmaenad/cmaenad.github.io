@@ -11,7 +11,7 @@ pre{background:#1a1a1a;padding:4px 8px;border-radius:4px;margin:2px 0;font-size:
 <h2>Test exhaustivo de movimientos</h2>
 <div id="out"></div>
 <script type="module">
-import { Cube, invertMoves } from './js/cube.js?v=9';
+import { Cube, invertMoves } from './js/cube.js?v=10';
 const out = document.getElementById('out');
 let pass=0, fail=0;
 
@@ -305,18 +305,20 @@ sec("Tests de movimientos inversos L' R' F' B'");
 }
 {
   const c=new Cube(); c.move("F'");
-  log("F': col der L(4)→fila inf U", allSame(row(c,0,2),4), 'U bot='+row(c,0,2));
-  log("F': fila inf U(0)→col izq R", allSame(col(c,5,0),0), 'R left='+col(c,5,0));
-  log("F': col izq R(5)→fila sup D", allSame(row(c,1,0),5), 'D top='+row(c,1,0));
-  log("F': fila sup D(1)→col der L", allSame(col(c,4,2),1), 'L right='+col(c,4,2));
+  // F' antihorario: R(izq)→U(inf), D(sup)→R(izq), L(der)→D(sup), U(inf)→L(der)
+  log("F': col izq R(5)→fila inf U", allSame(row(c,0,2),5), 'U bot='+row(c,0,2));
+  log("F': fila sup D(1)→col izq R", allSame(col(c,5,0),1), 'R left='+col(c,5,0));
+  log("F': col der L(4)→fila sup D", allSame(row(c,1,0),4), 'D top='+row(c,1,0));
+  log("F': fila inf U(0)→col der L", allSame(col(c,4,2),0), 'L right='+col(c,4,2));
   showState(c);
 }
 {
   const c=new Cube(); c.move("B'");
-  log("B': col der R(5)→fila sup U", allSame(row(c,0,0),5), 'U top='+row(c,0,0));
-  log("B': fila sup U(0)→col izq L", allSame(col(c,4,0),0), 'L left='+col(c,4,0));
-  log("B': col izq L(4)→fila inf D", allSame(row(c,1,2),4), 'D bot='+row(c,1,2));
-  log("B': fila inf D(1)→col der R", allSame(col(c,5,2),1), 'R right='+col(c,5,2));
+  // B' antihorario: L(izq)→U(sup), R(der)→L(izq), D(inf)→R(der), U(sup)→D(inf)
+  log("B': col izq L(4)→fila sup U", allSame(row(c,0,0),4), 'U top='+row(c,0,0));
+  log("B': fila inf D(1)→col izq L", allSame(col(c,4,0),1), 'L left='+col(c,4,0));
+  log("B': col der R(5)→fila inf D", allSame(row(c,1,2),5), 'D bot='+row(c,1,2));
+  log("B': fila sup U(0)→col der R", allSame(col(c,5,2),0), 'R right='+col(c,5,2));
   showState(c);
 }
 {
@@ -357,6 +359,26 @@ sec("Tests de movimientos inversos L' R' F' B'");
 }
 
 // ── SECCIÓN 6: Invertir mezcla ────────────────────────────────────
+sec('Verificación de paridad: T-perm y Niklas');
+{
+  const tperm=['R','U',"R'","U'","R'","F","R2","U'","R'","U'","R","U","R'","F'"];
+  const c=new Cube(); c.applyMoves(tperm);
+  const counts=Array(6).fill(0); c.state.flat().forEach(v=>counts[v]++);
+  log('T-perm×1: 9×cada color', counts.every(n=>n===9), counts.join(','));
+  c.applyMoves(tperm);
+  const counts2=Array(6).fill(0); c.state.flat().forEach(v=>counts2[v]++);
+  log('T-perm×2: 9×cada color', counts2.every(n=>n===9), counts2.join(','));
+  log('T-perm×2: isSolved', c.isSolved(), c.isSolved()?'':'estado='+c.state.map((f,i)=>'UDFBLR'[i]+':'+f.join('')).join(' '));
+}
+{
+  const niklas=["R","U2","R'","U'","R","U2","L'","U","R'","U'","L"];
+  const c=new Cube();
+  for(let i=0;i<3;i++) c.applyMoves(niklas);
+  const counts=Array(6).fill(0); c.state.flat().forEach(v=>counts[v]++);
+  log('Niklas×3: 9×cada color', counts.every(n=>n===9), counts.join(','));
+  log('Niklas×3: isSolved', c.isSolved());
+}
+
 sec('Invertir mezcla = identidad');
 {
   const scrambles = [
