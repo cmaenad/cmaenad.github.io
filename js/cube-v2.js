@@ -9,69 +9,115 @@
  *   3 4 5
  *   6 7 8
  *
- * Cada movimiento es una tabla de permutación de 54 entradas derivada
- * directamente de la definición física del cubo.
- *
- * Convención: perm[destino] = origen
- * Es decir: newState[i] = oldState[perm[i]]
- *
- * Las tablas se verifican con el test T-perm (orden 2) y Superflip (orden 2).
+ * Los movimientos se definen como ciclos explícitos de 4 stickers,
+ * derivados directamente de la geometría física del cubo.
+ * Cada ciclo [a,b,c,d] significa: a→b→c→d→a (horario).
  */
 
 export const FACE_NAMES = ['U','D','F','B','L','R'];
 export const FACES = { U:0, D:1, F:2, B:3, L:4, R:5 };
 export const CENTER = 4;
 
-// Offsets de cada cara en el array plano
-const O = { U:0, D:9, F:18, B:27, L:36, R:45 };
+// Índice absoluto: face*9 + posición local
+const S = (f, i) => f * 9 + i;
+// Índices de cara por nombre
+const FI = { U:0, D:1, F:2, B:3, L:4, R:5 };
+const I  = (face, pos) => FI[face] * 9 + pos;
 
-// Índice absoluto: cara + posición local (0-8)
-const I = (face, pos) => O[face] + pos;
+// ── Rotación de cara (9 stickers) ────────────────────────────────
+// Ciclos de la cara propia en sentido horario:
+//   esquinas: [0,2,8,6], aristas: [1,5,7,3]
+const FACE_CYCLES = [[0,2,8,6],[1,5,7,3]];
 
-// ── Construcción de permutaciones ─────────────────────────────────
+// ── Ciclos del anillo adyacente para cada movimiento ─────────────
+// Cada entrada es un array de 3 ciclos de 4 stickers.
+// Ciclo [a,b,c,d]: a→b→c→d→a en sentido horario.
 //
-// Cada movimiento horario se define por:
-//   1. La rotación de la cara misma (9 stickers)
-//   2. El ciclo de 12 stickers adyacentes
+// Convención de orientación: "horario" visto desde el exterior de esa cara.
 //
-// Para el ciclo adyacente usamos 4 grupos de 3 stickers.
-// El movimiento horario mueve: grupo A → grupo B → grupo C → grupo D → grupo A
-// En términos de permutación (destino ← origen):
-//   B ← A, C ← B, D ← C, A ← D
+// U (desde arriba):  F-top → R-top → B-top → L-top
+// D (desde abajo):   F-bot → L-bot → B-bot → R-bot
+// F (desde frente):  U-bot → R-left → D-top(inv) → L-right(inv)
+// B (desde atrás):   U-top(inv) → L-left → D-bot → R-right(inv)
+// L (desde izq):     U-left → F-left → D-left → B-right(inv)
+// R (desde der):     U-right → F-right → D-right → B-left(inv)
 
-function identity() {
-  return Array.from({length:54}, (_,i) => i);
-}
+const RING_CYCLES = {
+  U: [
+    [I('F',0), I('R',0), I('B',0), I('L',0)],
+    [I('F',1), I('R',1), I('B',1), I('L',1)],
+    [I('F',2), I('R',2), I('B',2), I('L',2)],
+  ],
+  D: [
+    [I('F',6), I('L',6), I('B',6), I('R',6)],
+    [I('F',7), I('L',7), I('B',7), I('R',7)],
+    [I('F',8), I('L',8), I('B',8), I('R',8)],
+  ],
+  F: [
+    [I('U',6), I('R',0), I('D',2), I('L',8)],
+    [I('U',7), I('R',3), I('D',1), I('L',5)],
+    [I('U',8), I('R',6), I('D',0), I('L',2)],
+  ],
+  B: [
+    [I('U',2), I('L',0), I('D',6), I('R',8)],
+    [I('U',1), I('L',3), I('D',7), I('R',5)],
+    [I('U',0), I('L',6), I('D',8), I('R',2)],
+  ],
+  L: [
+    [I('U',0), I('F',0), I('D',0), I('B',8)],
+    [I('U',3), I('F',3), I('D',3), I('B',5)],
+    [I('U',6), I('F',6), I('D',6), I('B',2)],
+  ],
+  R: [
+    [I('U',2), I('F',2), I('D',2), I('B',6)],
+    [I('U',5), I('F',5), I('D',5), I('B',3)],
+    [I('U',8), I('F',8), I('D',8), I('B',0)],
+  ],
+};
 
-function rotateFaceCW(perm, faceOffset) {
-  // Rotación horaria de una cara:
-  // posición 0←6, 1←3, 2←0, 3←7, 4←4, 5←1, 6←8, 7←5, 8←2
-  const src = [6,3,0, 7,4,1, 8,5,2];
-  for (let i = 0; i < 9; i++) {
-    perm[faceOffset + i] = faceOffset + src[i];
+// ── Construcción de permutación de 54 entradas ───────────────────
+// Convención: perm[destino] = origen  →  newState[i] = oldState[perm[i]]
+
+function buildPerm(faceName, cw) {
+  const fi = FI[faceName];
+  const base = fi * 9;
+  const perm = Array.from({length: 54}, (_, i) => i); // identidad
+
+  // Rotar la cara propia
+  for (const [a,b,c,d] of FACE_CYCLES) {
+    if (cw) {
+      // horario: a←d, b←a, c←b, d←c
+      perm[base+a] = base+d;
+      perm[base+b] = base+a;
+      perm[base+c] = base+b;
+      perm[base+d] = base+c;
+    } else {
+      // antihorario: a←b, b←c, c←d, d←a
+      perm[base+a] = base+b;
+      perm[base+b] = base+c;
+      perm[base+c] = base+d;
+      perm[base+d] = base+a;
+    }
   }
-}
 
-function cycleAdjacentCW(perm, a, b, c, d) {
-  // a, b, c, d son arrays de 3 índices absolutos cada uno
-  // Horario: B←A, C←B, D←C, A←D
-  // IMPORTANTE: leer todos los valores originales ANTES de escribir
-  for (let i = 0; i < 3; i++) {
-    const oa = perm[a[i]];
-    const ob = perm[b[i]];
-    const oc = perm[c[i]];
-    const od = perm[d[i]];
-    perm[b[i]] = oa;
-    perm[c[i]] = ob;
-    perm[d[i]] = oc;
-    perm[a[i]] = od;
+  // Ciclos del anillo adyacente
+  for (const [a,b,c,d] of RING_CYCLES[faceName]) {
+    if (cw) {
+      // horario a→b→c→d→a: b←a, c←b, d←c, a←d
+      perm[b] = a;
+      perm[c] = b;
+      perm[d] = c;
+      perm[a] = d;
+    } else {
+      // antihorario: a←b, d←a, c←d, b←c
+      perm[a] = b;
+      perm[b] = c;
+      perm[c] = d;
+      perm[d] = a;
+    }
   }
-}
 
-function invertPerm(p) {
-  const inv = new Array(54);
-  for (let i = 0; i < 54; i++) inv[p[i]] = i;
-  return inv;
+  return perm;
 }
 
 function composePerm(a, b) {
@@ -79,102 +125,14 @@ function composePerm(a, b) {
   return a.map(x => b[x]);
 }
 
-// ── Definición de los 6 movimientos horarios ──────────────────────
-//
-// Referencia física verificada:
-// U horario (desde arriba): fila sup de F va a R, R va a B, B va a L, L va a F
-// D horario (desde abajo):  fila inf de F va a L, L va a B, B va a R, R va a F
-// F horario (desde frente): fila inf U→col izq R→fila sup D(inv)→col der L(inv)
-// B horario (desde atrás):  fila sup U(inv)→col izq L→fila inf D→col der R(inv)
-// L horario (desde izq):    col izq U→col izq F→col izq D→col der B(inv)
-// R horario (desde der):    col der U→col der F→col der D→col izq B(inv)
-
-function buildU() {
-  const p = identity();
-  rotateFaceCW(p, O.U);
-  // F-top → R-top → B-top → L-top (horario: R←F, B←R, L←B, F←L)
-  cycleAdjacentCW(p,
-    [I('F',0),I('F',1),I('F',2)],
-    [I('R',0),I('R',1),I('R',2)],
-    [I('B',0),I('B',1),I('B',2)],
-    [I('L',0),I('L',1),I('L',2)]
-  );
-  return p;
-}
-
-function buildD() {
-  const p = identity();
-  rotateFaceCW(p, O.D);
-  // F-bot → L-bot → B-bot → R-bot (horario: L←F, B←L, R←B, F←R)
-  cycleAdjacentCW(p,
-    [I('F',6),I('F',7),I('F',8)],
-    [I('L',6),I('L',7),I('L',8)],
-    [I('B',6),I('B',7),I('B',8)],
-    [I('R',6),I('R',7),I('R',8)]
-  );
-  return p;
-}
-
-function buildF() {
-  const p = identity();
-  rotateFaceCW(p, O.F);
-  // U-bot(6,7,8) → R-left(0,3,6) → D-top-inv(2,1,0) → L-right-inv(8,5,2)
-  cycleAdjacentCW(p,
-    [I('U',6),I('U',7),I('U',8)],
-    [I('R',0),I('R',3),I('R',6)],
-    [I('D',2),I('D',1),I('D',0)],
-    [I('L',8),I('L',5),I('L',2)]
-  );
-  return p;
-}
-
-function buildB() {
-  const p = identity();
-  rotateFaceCW(p, O.B);
-  // U-top-inv(2,1,0) → L-left(0,3,6) → D-bot(6,7,8) → R-right-inv(8,5,2)
-  cycleAdjacentCW(p,
-    [I('U',2),I('U',1),I('U',0)],
-    [I('L',0),I('L',3),I('L',6)],
-    [I('D',6),I('D',7),I('D',8)],
-    [I('R',8),I('R',5),I('R',2)]
-  );
-  return p;
-}
-
-function buildL() {
-  const p = identity();
-  rotateFaceCW(p, O.L);
-  // U-left(0,3,6) → F-left(0,3,6) → D-left(0,3,6) → B-right-inv(8,5,2)
-  cycleAdjacentCW(p,
-    [I('U',0),I('U',3),I('U',6)],
-    [I('F',0),I('F',3),I('F',6)],
-    [I('D',0),I('D',3),I('D',6)],
-    [I('B',8),I('B',5),I('B',2)]
-  );
-  return p;
-}
-
-function buildR() {
-  const p = identity();
-  rotateFaceCW(p, O.R);
-  // U-right(2,5,8) → F-right(2,5,8) → D-right(2,5,8) → B-left-inv(6,3,0)
-  cycleAdjacentCW(p,
-    [I('U',2),I('U',5),I('U',8)],
-    [I('F',2),I('F',5),I('F',8)],
-    [I('D',2),I('D',5),I('D',8)],
-    [I('B',6),I('B',3),I('B',0)]
-  );
-  return p;
-}
-
-// ── Tabla de permutaciones ─────────────────────────────────────────
-const BASE = { U:buildU(), D:buildD(), F:buildF(), B:buildB(), L:buildL(), R:buildR() };
-
+// ── Tabla de permutaciones ────────────────────────────────────────
 const PERMS = {};
-for (const [name, p] of Object.entries(BASE)) {
-  PERMS[name]        = p;
-  PERMS[name + "'"]  = invertPerm(p);
-  PERMS[name + '2']  = composePerm(p, p);
+for (const name of FACE_NAMES) {
+  const cw  = buildPerm(name, true);
+  const ccw = buildPerm(name, false);
+  PERMS[name]       = cw;
+  PERMS[name + "'"] = ccw;
+  PERMS[name + '2'] = composePerm(cw, cw);
 }
 
 // ── Clase Cube ────────────────────────────────────────────────────
@@ -185,14 +143,7 @@ export class Cube {
   reset() {
     // Estado resuelto: cara i tiene todos sus stickers con valor i
     // U=0, D=1, F=2, B=3, L=4, R=5
-    this._s = Array.from({length:54}, (_,i) => {
-      if (i < 9)  return 0; // U
-      if (i < 18) return 1; // D
-      if (i < 27) return 2; // F
-      if (i < 36) return 3; // B
-      if (i < 45) return 4; // L
-      return 5;             // R
-    });
+    this._s = Array.from({length: 54}, (_, i) => Math.floor(i / 9));
   }
 
   clone() {
@@ -201,28 +152,19 @@ export class Cube {
     return c;
   }
 
-  /**
-   * state: expone el estado como array 2D [6][9] para el renderer.
-   * El orden de caras es U,D,F,B,L,R (índices 0-5).
-   */
   get state() {
     return [
-      this._s.slice(O.U, O.U+9),  // U=0
-      this._s.slice(O.D, O.D+9),  // D=1
-      this._s.slice(O.F, O.F+9),  // F=2
-      this._s.slice(O.B, O.B+9),  // B=3
-      this._s.slice(O.L, O.L+9),  // L=4
-      this._s.slice(O.R, O.R+9),  // R=5
+      this._s.slice(0,  9),   // U=0
+      this._s.slice(9,  18),  // D=1
+      this._s.slice(18, 27),  // F=2
+      this._s.slice(27, 36),  // B=3
+      this._s.slice(36, 45),  // L=4
+      this._s.slice(45, 54),  // R=5
     ];
   }
 
   set state(val) {
-    if (Array.isArray(val[0])) {
-      // Array 2D [6][9]
-      this._s = val.flat();
-    } else {
-      this._s = [...val];
-    }
+    this._s = Array.isArray(val[0]) ? val.flat() : [...val];
   }
 
   serialize() {
@@ -233,7 +175,6 @@ export class Cube {
     try {
       let arr;
       if (str.includes('|')) {
-        // Formato viejo: "000000000|111111111|..."
         arr = str.split('|').flatMap(p => p.split('').map(Number));
       } else {
         arr = str.split('').map(Number);
@@ -255,8 +196,7 @@ export class Cube {
 
   isSolved() {
     for (let f = 0; f < 6; f++) {
-      const base = f === 0 ? O.U : f === 1 ? O.D : f === 2 ? O.F :
-                   f === 3 ? O.B : f === 4 ? O.L : O.R;
+      const base   = f * 9;
       const center = this._s[base + 4];
       for (let i = 0; i < 9; i++) {
         if (this._s[base + i] !== center) return false;
@@ -273,9 +213,9 @@ export class Cube {
     let last = '', prev = '';
     for (let i = 0; i < n; i++) {
       let f;
-      do { f = faces[Math.floor(Math.random()*6)]; }
+      do { f = faces[Math.floor(Math.random() * 6)]; }
       while (f === last || (f === opp[last] && last === opp[prev]));
-      seq.push(f + sfx[Math.floor(Math.random()*3)]);
+      seq.push(f + sfx[Math.floor(Math.random() * 3)]);
       prev = last; last = f;
     }
     this.applyMoves(seq);
