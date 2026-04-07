@@ -11,7 +11,7 @@ pre{background:#1a1a1a;padding:4px 8px;border-radius:4px;margin:2px 0;font-size:
 <h2>Test Motor Cubo — versión simplificada</h2>
 <div id="out"></div>
 <script type="module">
-import { Cube, invertMoves } from './js/cube.js?v=15';
+import { Cube, invertMoves } from './js/cube.js?v=16';
 const out = document.getElementById('out');
 let pass=0, fail=0;
 
@@ -137,11 +137,34 @@ sec('Algoritmos con orden conocido');
 }
 {
   // T-perm: buscar orden hasta 60
+  // El T-perm estándar tiene orden 2. Si no, hay un bug en F o R2.
   const tp=['R','U',"R'","U'","R'","F","R2","U'","R'","U'","R","U","R'","F'"];
   const c=new Cube();
   let found=false;
   for(let i=1;i<=60;i++){c.applyMoves(tp);if(c.isSolved()){log('T-perm orden='+i,i===2,'orden esperado 2, obtenido '+i);found=true;break;}}
   if(!found)log('T-perm: no vuelve en 60 aplicaciones',false);
+}
+{
+  // Aislar: R' F R2 U' R' (parte central del T-perm)
+  // Si el T-perm tiene orden 42, el bug está en la interacción de estos movimientos
+  // Verificar: R' F R2 tiene orden conocido
+  const c=new Cube();
+  // Aplicar T-perm una vez y mostrar estado para análisis
+  c.applyMoves(['R','U',"R'","U'","R'","F","R2","U'","R'","U'","R","U","R'","F'"]);
+  const s=c.state.map((f,i)=>'UDFBLR'[i]+':'+f.join('')).join(' ');
+  log('T-perm×1 estado (para análisis)',false,s);
+  // Verificar que R2 = R R
+  const c1=new Cube(); c1.applyMoves(['R','R']);
+  const c2=new Cube(); c2.move('R2');
+  log('R2 = R R',c1.state.flat().join('')===c2.state.flat().join(''));
+  // Verificar que F R2 = F R R
+  const c3=new Cube(); c3.applyMoves(['F','R','R']);
+  const c4=new Cube(); c4.applyMoves(['F','R2']);
+  log('F R2 = F R R',c3.state.flat().join('')===c4.state.flat().join(''));
+  // Verificar R' F R2 U' R'
+  const c5=new Cube(); c5.applyMoves(["R'","F","R","R","U'","R'"]);
+  const c6=new Cube(); c6.applyMoves(["R'","F","R2","U'","R'"]);
+  log("R' F R R U' R' = R' F R2 U' R'",c5.state.flat().join('')===c6.state.flat().join(''));
 }
 {
   // Niklas: orden 3
