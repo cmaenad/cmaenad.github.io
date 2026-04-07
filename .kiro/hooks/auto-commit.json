@@ -7,6 +7,6 @@
   },
   "then": {
     "type": "runCommand",
-    "command": "git -C \"c:\\Users\\adria\\JuegoTalentLand\\cmaenad.github.io\" add . ; git -C \"c:\\Users\\adria\\JuegoTalentLand\\cmaenad.github.io\" diff --cached --quiet || git -C \"c:\\Users\\adria\\JuegoTalentLand\\cmaenad.github.io\" commit -m \"chore: auto-commit agente\" ; git -C \"c:\\Users\\adria\\JuegoTalentLand\\cmaenad.github.io\" push"
+    "command": "cd c:\\Users\\adria\\JuegoTalentLand\\cmaenad.github.io && git add -A && git diff --cached --quiet || git commit -m \"chore: auto-commit agente\" && git push"
   }
 }

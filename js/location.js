@@ -4,8 +4,9 @@
  * Si hay menos de 6, completa con complementos RGB.
  */
 
-// Paleta de colores por código de país ISO 3166-1 alpha-2
-// Colores principales de la bandera de cada país
+// Colores tradicionales del cubo de Rubik (orden estándar: U=blanco, D=amarillo, F=rojo, B=naranja, L=verde, R=azul)
+export const CLASSIC_COLORS = ['#FFFFFF','#FFFF00','#FF0000','#FF8C00','#009B48','#0046AD'];
+
 const FLAG_COLORS = {
   AR: ['#74ACDF','#FFFFFF','#F6B40E'],           // Argentina
   BR: ['#009C3B','#FFDF00','#002776','#FFFFFF'],  // Brasil
@@ -105,3 +106,10 @@ export async function resolveColors() {
 }
 
 export { ensureSixColors, FLAG_COLORS };
+
+// Devuelve un país al azar de la paleta (excluye DEFAULT)
+export function randomCountry() {
+  const keys = Object.keys(FLAG_COLORS).filter(k => k !== 'DEFAULT');
+  const code = keys[Math.floor(Math.random() * keys.length)];
+  return { colors: ensureSixColors(FLAG_COLORS[code]), country: code };
+}

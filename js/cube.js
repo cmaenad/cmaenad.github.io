@@ -85,30 +85,28 @@ export class Cube {
 
   /**
    * Ciclo de 4 grupos de stickers entre 4 caras adyacentes.
-   * positions: array de 4 grupos, cada grupo es array de [faceIdx, stickerIdx].
-   * En sentido horario: positions[0] <- positions[1] <- positions[2] <- positions[3] <- positions[0]
-   * (el grupo 0 recibe lo que tenía el grupo 3, etc.)
+   * Toma snapshot completo antes de escribir para evitar leer
+   * valores ya sobreescritos durante el mismo ciclo.
+   *
+   * En sentido horario: grupo[0] <- grupo[1] <- grupo[2] <- grupo[3] <- grupo[0]
    */
   _cycle(positions, cw) {
     const s = this.state;
+    // Snapshot de los 4 grupos ANTES de cualquier escritura
+    const snap = positions.map(group => group.map(([f, i]) => s[f][i]));
+
     if (cw) {
-      // Guardar el último grupo, luego desplazar hacia adelante
-      const tmp = positions[3].map(([f, i]) => s[f][i]);
-      for (let k = 3; k > 0; k--) {
-        positions[k].forEach(([f, i], j) => {
-          s[f][i] = s[positions[k - 1][j][0]][positions[k - 1][j][1]];
-        });
-      }
-      positions[0].forEach(([f, i], j) => { s[f][i] = tmp[j]; });
+      // grupo[0] recibe snap[3], grupo[1] recibe snap[0], etc.
+      positions.forEach((group, k) => {
+        const src = snap[(k + 3) % 4];
+        group.forEach(([f, i], j) => { s[f][i] = src[j]; });
+      });
     } else {
-      // Guardar el primer grupo, luego desplazar hacia atrás
-      const tmp = positions[0].map(([f, i]) => s[f][i]);
-      for (let k = 0; k < 3; k++) {
-        positions[k].forEach(([f, i], j) => {
-          s[f][i] = s[positions[k + 1][j][0]][positions[k + 1][j][1]];
-        });
-      }
-      positions[3].forEach(([f, i], j) => { s[f][i] = tmp[j]; });
+      // grupo[0] recibe snap[1], grupo[1] recibe snap[2], etc.
+      positions.forEach((group, k) => {
+        const src = snap[(k + 1) % 4];
+        group.forEach(([f, i], j) => { s[f][i] = src[j]; });
+      });
     }
   }
 

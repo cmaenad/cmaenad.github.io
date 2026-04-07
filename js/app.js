@@ -5,7 +5,7 @@
 import { Cube } from './cube.js';
 import { initRenderer, renderCube, applyViewRotation, setViewAngles, getViewAngles } from './renderer.js';
 import { initControls } from './controls.js';
-import { resolveColors } from './location.js';
+import { resolveColors, randomCountry, CLASSIC_COLORS } from './location.js';
 import { saveSession, loadSession } from './session.js';
 
 const cube = new Cube();
@@ -74,6 +74,27 @@ async function init() {
     onReset:      handleReset,
     containerEl,
   });
+
+  // Botón 🎨 Colores — toggle del panel
+  const colorPanel = document.getElementById('color-panel');
+  document.getElementById('btn-colors').addEventListener('click', (e) => {
+    e.stopPropagation();
+    colorPanel.classList.toggle('visible');
+  });
+  document.addEventListener('click', () => colorPanel.classList.remove('visible'));
+
+  document.getElementById('btn-location').addEventListener('click', () => {
+    colorPanel.classList.remove('visible');
+    handleRelocate();
+  });
+  document.getElementById('btn-random-country').addEventListener('click', () => {
+    colorPanel.classList.remove('visible');
+    handleRandomCountry();
+  });
+  document.getElementById('btn-classic').addEventListener('click', () => {
+    colorPanel.classList.remove('visible');
+    handleClassicColors();
+  });
 }
 
 async function loadColors(useDefault = false) {
@@ -117,6 +138,40 @@ function handleReset() {
   if (solveAnimating) return;
   cube.reset();
   renderCube(cube, colorsRef.value);
+  saveState();
+}
+
+async function handleRelocate() {
+  if (solveAnimating) return;
+  const btn = document.getElementById('btn-location');
+  btn.disabled = true;
+  btn.textContent = '⏳ Buscando...';
+  const result = await resolveColors();
+  colorsRef.value = result.colors;
+  country = result.country;
+  renderCube(cube, colorsRef.value);
+  showCountryInfo(country, colorsRef.value);
+  saveState();
+  btn.disabled = false;
+  btn.textContent = '📍 Mi ubicación';
+}
+
+function handleRandomCountry() {
+  if (solveAnimating) return;
+  const result = randomCountry();
+  colorsRef.value = result.colors;
+  country = result.country;
+  renderCube(cube, colorsRef.value);
+  showCountryInfo(country, colorsRef.value);
+  saveState();
+}
+
+function handleClassicColors() {
+  if (solveAnimating) return;
+  colorsRef.value = [...CLASSIC_COLORS];
+  country = 'CLASSIC';
+  renderCube(cube, colorsRef.value);
+  showCountryInfo('Clásico', colorsRef.value);
   saveState();
 }
 
