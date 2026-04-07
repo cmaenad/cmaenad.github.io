@@ -11,7 +11,7 @@ pre{background:#1a1a1a;padding:4px 8px;border-radius:4px;margin:2px 0;font-size:
 <h2>Test Motor Cubo — versión simplificada</h2>
 <div id="out"></div>
 <script type="module">
-import { Cube, invertMoves } from './js/cube.js?v=14';
+import { Cube, invertMoves } from './js/cube.js?v=15';
 const out = document.getElementById('out');
 let pass=0, fail=0;
 
@@ -136,14 +136,12 @@ sec('Algoritmos con orden conocido');
   log("(R' F R F')×6",c.isSolved());
 }
 {
-  // T-perm: orden 2 — verificar con orden real
+  // T-perm: buscar orden hasta 60
   const tp=['R','U',"R'","U'","R'","F","R2","U'","R'","U'","R","U","R'","F'"];
   const c=new Cube();
-  // Aplicar hasta 12 veces buscando el orden real
   let found=false;
-  for(let i=1;i<=12;i++){c.applyMoves(tp);if(c.isSolved()){log('T-perm orden='+i,true);found=true;break;}}
-  if(!found)log('T-perm: no vuelve a identidad en 12 aplicaciones',false,
-    'estado='+c.state.map((f,i)=>'UDFBLR'[i]+':'+f.join('')).join(' '));
+  for(let i=1;i<=60;i++){c.applyMoves(tp);if(c.isSolved()){log('T-perm orden='+i,i===2,'orden esperado 2, obtenido '+i);found=true;break;}}
+  if(!found)log('T-perm: no vuelve en 60 aplicaciones',false);
 }
 {
   // Niklas: orden 3
