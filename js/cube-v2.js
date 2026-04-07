@@ -79,13 +79,13 @@ const MOVES_DEF = {
 };
 
 // Aplica un ciclo de 4 en sentido horario sobre el array s (in-place)
-// Horario a→b→c→d→a: el valor de a va a b, b va a c, c va a d, d va a a
+// Horario a→b→c→d→a: b←a, c←b, d←c, a←d
 function cycleCW(s, a, b, c, d) {
-  const tmp = s[a];
-  s[a] = s[d];
+  const tmp = s[d];
   s[d] = s[c];
   s[c] = s[b];
-  s[b] = tmp;
+  s[b] = s[a];
+  s[a] = tmp;
 }
 
 // Aplica un ciclo de 4 en sentido antihorario
