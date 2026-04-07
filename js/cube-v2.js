@@ -9,128 +9,105 @@
  *   3 4 5
  *   6 7 8
  *
- * Los movimientos se definen como ciclos explícitos de 4 stickers,
- * derivados directamente de la geometría física del cubo.
- * Cada ciclo [a,b,c,d] significa: a→b→c→d→a (horario).
+ * Los movimientos se aplican directamente sobre el estado (sin tabla de
+ * permutación intermedia) usando ciclos de 4 posiciones.
+ * Ciclo horario [a,b,c,d]: tmp=d, d=c, c=b, b=a, a=tmp  (a←d←c←b←a)
  */
 
 export const FACE_NAMES = ['U','D','F','B','L','R'];
 export const FACES = { U:0, D:1, F:2, B:3, L:4, R:5 };
 export const CENTER = 4;
 
-// Índice absoluto: face*9 + posición local
-const S = (f, i) => f * 9 + i;
-// Índices de cara por nombre
 const FI = { U:0, D:1, F:2, B:3, L:4, R:5 };
 const I  = (face, pos) => FI[face] * 9 + pos;
 
-// ── Rotación de cara (9 stickers) ────────────────────────────────
-// Ciclos de la cara propia en sentido horario:
-//   esquinas: [0,2,8,6], aristas: [1,5,7,3]
-const FACE_CYCLES = [[0,2,8,6],[1,5,7,3]];
-
-// ── Ciclos del anillo adyacente para cada movimiento ─────────────
-// Cada entrada es un array de 3 ciclos de 4 stickers.
-// Ciclo [a,b,c,d]: a→b→c→d→a en sentido horario.
+// ── Ciclos de cada movimiento ─────────────────────────────────────
+// Cara propia: esquinas [0,2,8,6] y aristas [1,5,7,3] (horario)
+// Anillo: 3 ciclos de 4 stickers cada uno (horario)
 //
-// Convención de orientación: "horario" visto desde el exterior de esa cara.
-//
-// U (desde arriba):  F-top → R-top → B-top → L-top
-// D (desde abajo):   F-bot → L-bot → B-bot → R-bot
-// F (desde frente):  U-bot → R-left → D-top(inv) → L-right(inv)
-// B (desde atrás):   U-top(inv) → L-left → D-bot → R-right(inv)
-// L (desde izq):     U-left → F-left → D-left → B-right(inv)
-// R (desde der):     U-right → F-right → D-right → B-left(inv)
+// Verificado contra solver-v2.js (CYCLES) que funciona correctamente.
 
-const RING_CYCLES = {
-  U: [
-    [I('F',0), I('R',0), I('B',0), I('L',0)],
-    [I('F',1), I('R',1), I('B',1), I('L',1)],
-    [I('F',2), I('R',2), I('B',2), I('L',2)],
-  ],
-  D: [
-    [I('F',6), I('L',6), I('B',6), I('R',6)],
-    [I('F',7), I('L',7), I('B',7), I('R',7)],
-    [I('F',8), I('L',8), I('B',8), I('R',8)],
-  ],
-  F: [
-    [I('U',6), I('R',0), I('D',2), I('L',8)],
-    [I('U',7), I('R',3), I('D',1), I('L',5)],
-    [I('U',8), I('R',6), I('D',0), I('L',2)],
-  ],
-  B: [
-    [I('U',2), I('L',0), I('D',6), I('R',8)],
-    [I('U',1), I('L',3), I('D',7), I('R',5)],
-    [I('U',0), I('L',6), I('D',8), I('R',2)],
-  ],
-  L: [
-    [I('U',0), I('F',0), I('D',0), I('B',8)],
-    [I('U',3), I('F',3), I('D',3), I('B',5)],
-    [I('U',6), I('F',6), I('D',6), I('B',2)],
-  ],
-  R: [
-    [I('U',2), I('F',2), I('D',2), I('B',6)],
-    [I('U',5), I('F',5), I('D',5), I('B',3)],
-    [I('U',8), I('F',8), I('D',8), I('B',0)],
-  ],
+const MOVES_DEF = {
+  U: {
+    face: 0,
+    ring: [
+      [I('F',0), I('R',0), I('B',0), I('L',0)],
+      [I('F',1), I('R',1), I('B',1), I('L',1)],
+      [I('F',2), I('R',2), I('B',2), I('L',2)],
+    ],
+  },
+  D: {
+    face: 1,
+    ring: [
+      [I('F',6), I('L',6), I('B',6), I('R',6)],
+      [I('F',7), I('L',7), I('B',7), I('R',7)],
+      [I('F',8), I('L',8), I('B',8), I('R',8)],
+    ],
+  },
+  F: {
+    face: 2,
+    ring: [
+      [I('U',6), I('R',0), I('D',2), I('L',8)],
+      [I('U',7), I('R',3), I('D',1), I('L',5)],
+      [I('U',8), I('R',6), I('D',0), I('L',2)],
+    ],
+  },
+  B: {
+    face: 3,
+    ring: [
+      [I('U',2), I('L',0), I('D',6), I('R',8)],
+      [I('U',1), I('L',3), I('D',7), I('R',5)],
+      [I('U',0), I('L',6), I('D',8), I('R',2)],
+    ],
+  },
+  L: {
+    face: 4,
+    ring: [
+      [I('U',0), I('F',0), I('D',0), I('B',8)],
+      [I('U',3), I('F',3), I('D',3), I('B',5)],
+      [I('U',6), I('F',6), I('D',6), I('B',2)],
+    ],
+  },
+  R: {
+    face: 5,
+    ring: [
+      [I('U',2), I('F',2), I('D',2), I('B',6)],
+      [I('U',5), I('F',5), I('D',5), I('B',3)],
+      [I('U',8), I('F',8), I('D',8), I('B',0)],
+    ],
+  },
 };
 
-// ── Construcción de permutación de 54 entradas ───────────────────
-// Convención: perm[destino] = origen  →  newState[i] = oldState[perm[i]]
-
-function buildPerm(faceName, cw) {
-  const fi = FI[faceName];
-  const base = fi * 9;
-  const perm = Array.from({length: 54}, (_, i) => i); // identidad
-
-  // Rotar la cara propia
-  // Ciclo a→b→c→d→a horario: perm[destino]=origen → b←a, c←b, d←c, a←d
-  for (const [a,b,c,d] of FACE_CYCLES) {
-    if (cw) {
-      perm[base+b] = base+a;
-      perm[base+c] = base+b;
-      perm[base+d] = base+c;
-      perm[base+a] = base+d;
-    } else {
-      perm[base+a] = base+b;
-      perm[base+b] = base+c;
-      perm[base+c] = base+d;
-      perm[base+d] = base+a;
-    }
-  }
-
-  // Ciclos del anillo adyacente
-  // Ciclo a→b→c→d→a horario: b←a, c←b, d←c, a←d
-  for (const [a,b,c,d] of RING_CYCLES[faceName]) {
-    if (cw) {
-      perm[b] = a;
-      perm[c] = b;
-      perm[d] = c;
-      perm[a] = d;
-    } else {
-      perm[a] = b;
-      perm[b] = c;
-      perm[c] = d;
-      perm[d] = a;
-    }
-  }
-
-  return perm;
+// Aplica un ciclo de 4 en sentido horario sobre el array s (in-place)
+// Horario a→b→c→d→a: el valor de a va a b, b va a c, c va a d, d va a a
+function cycleCW(s, a, b, c, d) {
+  const tmp = s[a];
+  s[a] = s[d];
+  s[d] = s[c];
+  s[c] = s[b];
+  s[b] = tmp;
 }
 
-function composePerm(a, b) {
-  // Aplica primero a, luego b: result[i] = b[a[i]]
-  return a.map(x => b[x]);
+// Aplica un ciclo de 4 en sentido antihorario
+function cycleCCW(s, a, b, c, d) {
+  const tmp = s[a];
+  s[a] = s[b];
+  s[b] = s[c];
+  s[c] = s[d];
+  s[d] = tmp;
 }
 
-// ── Tabla de permutaciones ────────────────────────────────────────
-const PERMS = {};
-for (const name of FACE_NAMES) {
-  const cw  = buildPerm(name, true);
-  const ccw = buildPerm(name, false);
-  PERMS[name]       = cw;
-  PERMS[name + "'"] = ccw;
-  PERMS[name + '2'] = composePerm(cw, cw);
+function applyMove(s, faceName, cw) {
+  const def  = MOVES_DEF[faceName];
+  const base = def.face * 9;
+  const fn   = cw ? cycleCW : cycleCCW;
+
+  // Rotar cara propia: esquinas y aristas
+  fn(s, base+0, base+2, base+8, base+6);
+  fn(s, base+1, base+5, base+7, base+3);
+
+  // Rotar anillo adyacente
+  for (const [a,b,c,d] of def.ring) fn(s, a, b, c, d);
 }
 
 // ── Clase Cube ────────────────────────────────────────────────────
@@ -139,8 +116,6 @@ export class Cube {
   constructor() { this.reset(); }
 
   reset() {
-    // Estado resuelto: cara i tiene todos sus stickers con valor i
-    // U=0, D=1, F=2, B=3, L=4, R=5
     this._s = Array.from({length: 54}, (_, i) => Math.floor(i / 9));
   }
 
@@ -152,12 +127,12 @@ export class Cube {
 
   get state() {
     return [
-      this._s.slice(0,  9),   // U=0
-      this._s.slice(9,  18),  // D=1
-      this._s.slice(18, 27),  // F=2
-      this._s.slice(27, 36),  // B=3
-      this._s.slice(36, 45),  // L=4
-      this._s.slice(45, 54),  // R=5
+      this._s.slice(0,  9),
+      this._s.slice(9,  18),
+      this._s.slice(18, 27),
+      this._s.slice(27, 36),
+      this._s.slice(36, 45),
+      this._s.slice(45, 54),
     ];
   }
 
@@ -185,9 +160,13 @@ export class Cube {
   }
 
   move(notation) {
-    const perm = PERMS[notation.trim()];
-    if (!perm) throw new Error(`Movimiento desconocido: ${notation}`);
-    this._s = perm.map(j => this._s[j]);
+    const n = notation.trim();
+    const face = n[0];
+    const mod  = n.slice(1);
+    if (!MOVES_DEF[face]) throw new Error(`Movimiento desconocido: ${notation}`);
+    const times = mod === '2' ? 2 : 1;
+    const cw    = mod !== "'";
+    for (let i = 0; i < times; i++) applyMove(this._s, face, cw);
   }
 
   applyMoves(moves) { moves.forEach(m => this.move(m)); }
